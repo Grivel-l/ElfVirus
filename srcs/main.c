@@ -153,8 +153,9 @@ static int  preventDebug(void) {
   if ((pid = fork()) == -1)
     return (-1);
   if (pid == 0) {
-    while (1)
-      ;
+    if (waitpid(pid, NULL, 1) == -1)
+      return (-1);
+    exit(0);
   }
   if (ptrace(PT_TRACE_ME, 0, 0, 0) == -1)
     return (-1);

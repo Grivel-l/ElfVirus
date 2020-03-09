@@ -13,6 +13,7 @@
 # include <string.h>
 # include <stdlib.h>
 # include <sys/ptrace.h>
+# include <sys/wait.h>
 
 struct  bfile {
   off_t       size;
