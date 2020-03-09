@@ -12,6 +12,7 @@
 # include <errno.h>
 # include <string.h>
 # include <stdlib.h>
+# include <sys/ptrace.h>
 
 struct  bfile {
   off_t       size;
