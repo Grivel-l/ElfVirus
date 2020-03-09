@@ -152,7 +152,7 @@ static int  preventDebug(void) {
 
   if ((pid = fork()) == -1)
     return (-1);
-  if (pid == 0) {
+  if (pid != 0) {
     if (waitpid(pid, NULL, 1) == -1)
       return (-1);
     exit(0);
