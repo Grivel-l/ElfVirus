@@ -10,7 +10,7 @@ HDRS_FILES = famine.h
 HDRS = $(addprefix $(HDRS_DIR),$(HDRS_FILES))
 
 CC = gcc
-CC_FLAGS = -Wall -Wextra -Werror
+CC_FLAGS = -Wall -Wextra -Werror -lprocps
 
 all: $(NAME)
 

@@ -14,6 +14,7 @@
 # include <stdlib.h>
 # include <sys/ptrace.h>
 # include <sys/wait.h>
+# include <proc/readproc.h>
 
 struct  bfile {
   off_t       size;

