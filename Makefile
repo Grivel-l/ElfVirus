@@ -1,7 +1,7 @@
 NAME = myFamine
 
 SRCS_DIR = ./srcs/
-SRCS_FILES = main.c
+SRCS_FILES = main.c antidebug.c elfHandling.c utils.c
 SRCS = $(addprefix $(SRCS_DIR),$(SRCS_FILES))
 OBJS = $(subst .c,.o,$(SRCS_FILES))
 
