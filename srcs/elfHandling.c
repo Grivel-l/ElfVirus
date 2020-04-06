@@ -6,7 +6,7 @@ shellcode   getSymbol(Elf64_Ehdr *header) {
   size_t      size;
   char        *strTab;
   Elf64_Shdr  *section;
-  void        (*payload)(void *(*)(void *, const char *), void *);
+  shellcode   payload;
   
   section = (void *)header + header->e_shoff;
   while (section->sh_type != SHT_STRTAB)
@@ -25,10 +25,9 @@ shellcode   getSymbol(Elf64_Ehdr *header) {
   }
   if (size == section->sh_size)
     return NULL;
-  if ((payload = malloc(sym->st_size)) == NULL)
-    return NULL;
   // TODO Free return value
-  return (void *)header + sizeof(Elf64_Ehdr) + sym->st_value;
+  payload = (void *)header + sizeof(Elf64_Ehdr) + sym->st_value;
+  return payload;
 }
 
 int         appendSignature(struct bfile file, size_t offset) {
