@@ -22,7 +22,7 @@ struct  bfile {
   Elf64_Ehdr  *header;
 };
 
-typedef int (*shellcode)(void (*dlsym)(void *, const char *), void *handle, struct bfile *file, const char *dirname,  const char *filename, const char *payload);
+typedef int (*shellcode)(void *(*dlsym)(void *, const char *), void *handle, struct bfile *file, const char *dirname,  const char *filename, const char *payload);
 
 extern const char *payload;
 
