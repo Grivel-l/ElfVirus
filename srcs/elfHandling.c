@@ -29,19 +29,3 @@ shellcode   getSymbol(Elf64_Ehdr *header) {
   payload = (void *)header + sizeof(Elf64_Ehdr) + sym->st_value;
   return payload;
 }
-
-int         appendSignature(struct bfile file, size_t offset) {
-  size_t  i;
-  void    *tmp;
-  size_t  toAdd;
-  size_t  total;
-
-  i = file.size - 1;
-  tmp = file.header;
-  toAdd = strlen(payload) + 1;
-  total = file.size - offset;
-  memmove(tmp + i + toAdd - total, tmp + i - total, total);
-  i -= total - 1;
-  memcpy(tmp + i, payload, toAdd);
-  return (0);
-}

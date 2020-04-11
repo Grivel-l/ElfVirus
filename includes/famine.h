@@ -29,10 +29,6 @@ extern const char *payload;
 int         preventDebug(void);
 int         checkProcess(void);
 
-int         appendSignature(struct bfile file, size_t offset);
-
-int         writeToFile(const char *dirname, const char *filename, struct bfile header);
-
 shellcode   getSymbol(Elf64_Ehdr *header);
 
 #endif
