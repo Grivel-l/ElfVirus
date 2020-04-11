@@ -45,16 +45,3 @@ int         appendSignature(struct bfile file, size_t offset) {
   memcpy(tmp + i, payload, toAdd);
   return (0);
 }
-
-Elf64_Shdr *getDataSectionHeader(Elf64_Ehdr *header) {
-  Elf64_Shdr  *pointer;
-  Elf64_Shdr  *shstrHeader;
-
-  pointer = ((void *)header) + header->e_shoff;
-  shstrHeader = ((void *)header) + header->e_shoff + sizeof(Elf64_Shdr) * header->e_shstrndx;
-  dprintf(1, "shstrheader: %p\n", shstrHeader);
-  while (strcmp(((void *)header) + shstrHeader->sh_offset + pointer->sh_name, ".data") != 0)
-    pointer += 1;
-  return (pointer);
-}
-

