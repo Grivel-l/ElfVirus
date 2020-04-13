@@ -24,7 +24,8 @@ struct  bfile {
 
 #define PAYLOAD_EP "infection"
 
-typedef int (*shellcode)(void *(*dlsym)(void *, const char *), void *handle, const char *dirname,  const char *filename, const char *payload);
+/* typedef int (*shellcode)(void *(*dlsym)(void *, const char *), void *handle, const char *dirname,  const char *filename, const char *payload); */
+typedef int (*shellcode)(void);
 
 extern const char *payload;
 
