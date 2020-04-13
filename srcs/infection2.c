@@ -8,10 +8,7 @@ static int   myWrite(int fd, const void *buf, size_t count) {
   register size_t     rdx asm("rdx") = count;
 
   asm("syscall"
-    : "=r" (rax)
-    : "r" (rdi),
-    "r" (rsi),
-    "r" (rdx));
+    : "=r" (rax));
   return (rax);
 }
 
