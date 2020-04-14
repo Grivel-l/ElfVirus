@@ -48,6 +48,30 @@ static int  fstat(int fd, struct stat *statbuf) {
   return (rax);
 }
 
+static void *mmap(void *addr, size_t len, int prot, int flags, int fildes, off_t off) {
+  register int8_t       rax asm("rax") = 9;
+  register void   *rdi asm("rdi") = addr;
+  register size_t rsi asm("rsi") = len;
+  register int    rdx asm("rdx") = prot;
+  register int    r10 asm("r10") = flags;
+  register int    r8 asm("r8") = fildes;
+  register off_t  r9 asm("r9") = off;
+
+  asm("syscall"
+    : "=r" (rax));
+  return (NULL + rax);
+}
+
+static int  munmap(void *addr, size_t len) {
+  register int8_t       rax asm("rax") = 11;
+  register void   *rdi asm("rdi") = addr;
+  register size_t rsi asm("rsi") = len;
+
+  asm("syscall"
+    : "=r" (rax));
+  return (rax);
+}
+
 static void *memcpy(void *dest, const void *src, size_t n) {
   char  *result;
 
@@ -85,7 +109,7 @@ static size_t strlen(const char *s) {
   return (i);
 }
 
-int strcmp(const char *s1, const char *s2) {
+static int strcmp(const char *s1, const char *s2) {
   size_t  i;
 
   i = 0;
@@ -97,7 +121,7 @@ int strcmp(const char *s1, const char *s2) {
   return (s1[i] - s2[i]);
 }
 
-void  *memmove(void *dest, const void *src, size_t n) {
+static void  *memmove(void *dest, const void *src, size_t n) {
   size_t  i;
 
   i = 0;
