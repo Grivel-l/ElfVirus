@@ -7,6 +7,8 @@
 #include <signal.h>
 #include <dirent.h>
 
+#define BUF_SIZE 1024
+
 typedef off_t off64_t;
 typedef ino_t ino64_t;
 
@@ -173,34 +175,23 @@ static void  *memmove(void *dest, const void *src, size_t n) {
 /* } */
 
 static int  infectBins(const char *dirname) {
+  int                   bpos;
   int                   nread;
   int                   fd;
-  struct linux_dirent *dirp;
-  char  yo[1024];
-  char  d_type;
-  /* struct dirent *file; */
+  struct linux_dirent   *dirp;
+  char                  yo[BUF_SIZE];
+  char                  d_type;
 
   if ((fd = open(dirname, O_RDONLY | O_DIRECTORY, 0)) < 0)
     return (-1);
-  dprintf(1, "Dirname: %s, Fd: %i\n", dirname, fd);
-  nread = getdents(fd, (struct linux_dirent *)yo, 1024);
-  dprintf(1, "Nread: %i\n", nread);
-  int bpos;
-
+  if ((nread = getdents(fd, (struct linux_dirent *)yo, BUF_SIZE)) < 0)
+    return (1);
   bpos = 0;
   while (bpos < nread) {
     dirp = (struct linux_dirent *) (yo + bpos);
     dprintf(1, "Filename: %s\n", dirp->d_name);
     bpos += dirp->d_reclen;
   }
-  /* if ((dir = opendir(dirname)) == NULL) */
-  /*   return (-1); */
-  /* while ((file = readdir(dir)) != NULL) { */
-    /* if (infectFile(dirname, file, fun) == -1) { */
-    /*   closedir(dir); */
-    /*   return (-1); */
-    /* } */
-  /* } */
   dprintf(1, "Close: %i\n", close(fd));
   return (0);
 }
