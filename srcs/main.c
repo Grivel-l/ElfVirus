@@ -30,7 +30,7 @@ int   main(void) {
   #endif
   if ((fun = getSymbol((Elf64_Ehdr *)(code))) == NULL)
     return (-1);
-  dprintf(1, "Ret: %i\n", fun());
+  dprintf(1, "Ret: %i\n", fun((void *)0x42));
   #ifdef DEBUG
     munmap(code, stats.st_size);
   #else

