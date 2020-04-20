@@ -138,10 +138,9 @@ static int  getdents(unsigned int fd, struct linux_dirent *dirp, unsigned int co
 
 static void *memcpy(void *dest, const void *src, size_t n) {
   while (n != 0) {
-    ((char *)dest)[n] = ((char *)src)[n];
     n -= 1;
+    ((char *)dest)[n] = ((char *)src)[n];
   }
-  ((char *)dest)[0] = ((char *)src)[0];
   return (dest);
 }
 
@@ -185,27 +184,20 @@ static int strcmp(const char *s1, const char *s2) {
 
 static void *memset(void *s, int c, size_t n) {
   while (n != 0) {
-    ((char *)s)[n] = c;
     n -= 1;
+    ((char *)s)[n] = c;
   }
-  ((char *)s)[0] = c;
   return (s);
 }
 
 static void  *memmove(void *dest, const void *src, size_t n) {
-  size_t  i;
-
-  i = 0;
   if (src >= dest)
     memcpy(dest, src, n);
   else {
-    i += n - 1;
     while (n != 0) {
-      ((char *)dest)[i] = ((char *)src)[i];
       n -= 1;
-      i -= 1;
+      ((char *)dest)[n] = ((char *)src)[n];
     }
-    ((char *)dest)[0] = ((char *)src)[0];
   }
   return (dest);
 }
@@ -314,7 +306,6 @@ static void  appendSignature(struct bfile file, size_t offset) {
 
   char payload[] = "HelloWorldaaaaa";
   toAdd = strlen(payload) + 1;
-  // TODO Lose 1 byte from comment section
   memmove(((void *)file.header) + offset + toAdd, ((void *)file.header) + offset, file.size - offset);
   memcpy(((void *)file.header) + offset, payload, toAdd);
 }
