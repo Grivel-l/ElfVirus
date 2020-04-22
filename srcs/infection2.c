@@ -58,7 +58,7 @@ int   entry_point(void *magic) {
 }
 
 static int  write(int fd, const void *buf, size_t count) {
-  register int8_t     rax asm("rax") = 1;
+  register int        rax asm("rax") = 1;
   register int        rdi asm("rdi") = fd;
   register const void *rsi asm("rsi") = buf;
   register size_t     rdx asm("rdx") = count;
@@ -70,7 +70,7 @@ static int  write(int fd, const void *buf, size_t count) {
 
 
 static int  open(const char *pathname, int flags, int mode) {
-  register int8_t     rax asm("rax") = 2;
+  register int        rax asm("rax") = 2;
   register const char *rdi asm("rdi") = pathname;
   register int        rsi asm("rsi") = flags;
   register int        rdx asm("rdx") = mode;
@@ -81,7 +81,7 @@ static int  open(const char *pathname, int flags, int mode) {
 }
 
 static int  close(int fd) {
-  register int8_t       rax asm("rax") = 3;
+  register int          rax asm("rax") = 3;
   register unsigned int rdi asm("rdi") = fd;
 
   asm("syscall"
@@ -90,7 +90,7 @@ static int  close(int fd) {
 }
 
 static int  stat(const char *filename, struct stat *statbuf) {
-  register int8_t       rax asm("rax") = 4;
+  register int          rax asm("rax") = 4;
   register const char   *rdi asm("rdi") = filename;
   register struct stat  *rsi asm("rsi") = statbuf;
 
@@ -115,7 +115,7 @@ static void *mmap(void *addr, size_t len, int prot, int flags, int fildes, off_t
 }
 
 static int  munmap(void *addr, size_t len) {
-  register int8_t       rax asm("rax") = 11;
+  register int    rax asm("rax") = 11;
   register void   *rdi asm("rdi") = addr;
   register size_t rsi asm("rsi") = len;
 
@@ -125,15 +125,14 @@ static int  munmap(void *addr, size_t len) {
 }
 
 static int  getdents(unsigned int fd, struct linux_dirent *dirp, unsigned int count) {
-  register int                    ret asm("rax");
-  register int8_t                 rax asm("rax") = 78;
+  register int                    rax asm("rax") = 78;
   register unsigned int           rdi asm("rdi") = fd;
   register struct linux_dirent  *rsi asm("rsi") = dirp;
   register unsigned int           rdx asm("rdx") = count;
 
   asm("syscall"
-    : "=r" (ret));
-  return (ret);
+    : "=r" (rax));
+  return (rax);
 }
 
 static void *memcpy(void *dest, const void *src, size_t n) {
