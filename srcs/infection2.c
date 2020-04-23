@@ -16,16 +16,6 @@ static void  start(void) {}
 #define PAYLOAD "HelloWorld"
 #define MAP_FAILED	((void *) -1)
 
-typedef off_t off64_t;
-typedef ino_t ino64_t;
-
-struct  linux_dirent {
-  unsigned long         d_ino;
-  unsigned long         d_off;
-  unsigned short        d_reclen;
-  char                  d_name[];
-};
-
 static void end(void);
 static void lambdaEnd(void);
 static void lambdaStart(void);
@@ -102,6 +92,15 @@ static int unObfuscate(void) {
 }
 
 static void encryptStart(void) {}
+typedef off_t off64_t;
+typedef ino_t ino64_t;
+
+struct  linux_dirent {
+  unsigned long         d_ino;
+  unsigned long         d_off;
+  unsigned short        d_reclen;
+  char                  d_name[];
+};
 static int  write(int fd, const void *buf, size_t count) {
   register int        rax asm("rax") = 1;
   register int        rdi asm("rdi") = fd;
@@ -112,7 +111,6 @@ static int  write(int fd, const void *buf, size_t count) {
     : "=r" (rax));
   return (rax);
 }
-
 
 static int  open(const char *pathname, int flags, int mode) {
   register int        rax asm("rax") = 2;
