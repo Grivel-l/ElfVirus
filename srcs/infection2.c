@@ -38,20 +38,20 @@ int   entry_point(void *magic) {
   /*   return (1); */
   if (magic == (void *)0x42)
     return (0);
-  register int64_t rax2 asm("rax") = 0;
-  register int64_t rbx2 asm("rbx") = 0;
-  register int64_t rcx2 asm("rcx") = 0;
-  register int64_t rdx2 asm("rdx") = 0;
-  register int64_t rsi2 asm("rsi") = 0;
-  register int64_t rdi2 asm("rdi") = 0;
-  register int64_t r82 asm("r8") = 0;
-  register int64_t r92 asm("r9") = 0;
-  register int64_t r102 asm("r10") = 0;
-  register int64_t r112 asm("r11") = 0;
-  register int64_t r122 asm("r12") = 0;
-  register int64_t r132 asm("r13") = 0;
-  register int64_t r142 asm("r14") = 0;
-  register int64_t r152 asm("r15") = 0;
+  register int8_t rax2 asm("rax") = 0;
+  register int8_t rbx2 asm("rbx") = 0;
+  register int8_t rcx2 asm("rcx") = 0;
+  register int8_t rdx2 asm("rdx") = 0;
+  register int8_t rsi2 asm("rsi") = 0;
+  register int8_t rdi2 asm("rdi") = 0;
+  register int8_t r82 asm("r8") = 0;
+  register int8_t r92 asm("r9") = 0;
+  register int8_t r102 asm("r10") = 0;
+  register int8_t r112 asm("r11") = 0;
+  register int8_t r122 asm("r12") = 0;
+  register int8_t r132 asm("r13") = 0;
+  register int8_t r142 asm("r14") = 0;
+  register int8_t r152 asm("r15") = 0;
   asm("jmp endSC");
 }
 
@@ -113,8 +113,7 @@ static int  write(int fd, const void *buf, size_t count) {
 }
 
 static int  open(const char *pathname, int flags, int mode) {
-  register int        rax asm("rax") = 2;
-  register const char *rdi asm("rdi") = pathname;
+  register int        rax asm("rax") = 2; register const char *rdi asm("rdi") = pathname;
   register int        rsi asm("rsi") = flags;
   register int        rdx asm("rdx") = mode;
 
