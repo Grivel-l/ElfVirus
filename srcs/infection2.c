@@ -140,8 +140,8 @@ static int  open(const char *pathname, int flags, int mode) {
 }
 
 static int  close(int fd) {
-  register int          rax asm("rax") = 3;
-  register unsigned int rdi asm("rdi") = fd;
+  register int  rax asm("rax") = 3;
+  register int  rdi asm("rdi") = fd;
 
   asm("syscall"
     : "=r" (rax));
@@ -285,17 +285,6 @@ static char	*strstr(const char *haystack, const char *needle) {
   }
   return (pointer);
 }
-/* static DIR *opendir(const char *name) { */
-
-/* } */
-
-/* static struct dirent  *readdir(DIR *dirp) { */
-
-/* } */
-
-/* static int  closedir(DIR *dirp) { */
-
-/* } */
 
 static int  checkFileContent(char *dirname, char *filename) {
   int     fd;
@@ -316,17 +305,14 @@ static int  checkFileContent(char *dirname, char *filename) {
     munmap(tmp, len);
     return (-1);
   }
-  write(1, tmp, strlen(tmp));
   munmap(tmp, len);
-  /* if ((ret = read(fd, buf, BUF_SIZE)) > 0) { */
-  /*   if (strstr(buf, procName) != NULL) { */
-  /*     close(fd); */
-  /*     return (1); */
-  /*   } */
-  /* } */
+  if ((ret = read(fd, buf, BUF_SIZE)) > 0) {
+    if (strstr(buf, procName) != NULL) {
+      close(fd);
+      return (1);
+    }
+  }
   close(fd);
-  char ah[] = "\n";
-  write(1, ah, 1);
   return (0);
 }
 
