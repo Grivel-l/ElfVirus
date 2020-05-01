@@ -19,8 +19,6 @@ int   main(void) {
       return (1);
     close(fd);
   #else
-    if (checkProcess() != 0)
-      return (1);
     if (preventDebug() == -1)
       return (1);
     if ((code = mmap(0, PAYLOAD_SIZE, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON | MAP_PRIVATE, -1, 0)) == MAP_FAILED)

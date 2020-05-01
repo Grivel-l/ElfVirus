@@ -18,21 +18,3 @@ int  preventDebug(void) {
   }
   return (0);
 }
-
-int checkProcess(void) {
-  PROCTAB *pt;
-  proc_t  *proc;
-
-  if ((pt = openproc(PROC_FILLCOM)) == NULL)
-    return (-1);
-  proc = NULL;
-  while ((proc = readproc(pt, proc)) != NULL) {
-    if (proc->cmdline != NULL)
-      if (strstr(proc->cmdline[0], "gdb") != NULL)
-        return (1);
-  }
-  free(proc);
-  closeproc(pt);
-  return (0);
-}
-

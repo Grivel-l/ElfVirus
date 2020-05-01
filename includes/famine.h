@@ -30,7 +30,6 @@ typedef int (*shellcode)(void *);
 extern const char *payload;
 
 int         preventDebug(void);
-int         checkProcess(void);
 
 shellcode   getSymbol(Elf64_Ehdr *header);
 
