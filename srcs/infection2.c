@@ -463,6 +463,7 @@ static int  mapFile(const char *dirname, const char *filename, struct bfile *bin
   size_t      len;
   char        *tmp;
   char        slash[] = "/";
+  char        payload[] = PAYLOAD;
   struct stat stats;
 
   len = strlen(dirname) + strlen(filename) + 2;
@@ -483,7 +484,7 @@ static int  mapFile(const char *dirname, const char *filename, struct bfile *bin
     munmap(tmp, len);
     return (-1);
   }
-  if ((bin->header = mmap(0, stats.st_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE, fd, 0)) == MAP_FAILED) {
+  if ((bin->header = mmap(0, stats.st_size + strlen(payload), PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE, fd, 0)) == MAP_FAILED) {
     close(fd);
     munmap(tmp, len);
     return (-1);
