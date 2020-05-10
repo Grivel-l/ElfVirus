@@ -1,4 +1,4 @@
-#include "famine.h"
+#include "virus.h"
 #define DEBUG
 #define PAYLOAD_SIZE 0
 #define PAYLOAD_CONTENT ""

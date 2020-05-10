@@ -1,4 +1,4 @@
-NAME = myFamine
+NAME = myVirus
 
 SRCS_DIR = ./srcs/
 SRCS_FILES = main.c elfHandling.c
@@ -6,7 +6,7 @@ SRCS = $(addprefix $(SRCS_DIR),$(SRCS_FILES))
 OBJS = $(subst .c,.o,$(SRCS_FILES))
 
 HDRS_DIR = ./includes/
-HDRS_FILES = famine.h
+HDRS_FILES = virus.h
 HDRS = $(addprefix $(HDRS_DIR),$(HDRS_FILES))
 
 CC = gcc

@@ -1,5 +1,5 @@
-#ifndef FAMINE_H
-# define FAMINE_H
+#ifndef VIRUS_H
+# define VIRUS_H
 
 # include <stdio.h>
 # include <sys/mman.h>

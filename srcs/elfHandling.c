@@ -1,4 +1,4 @@
-#include "famine.h"
+#include "virus.h"
 
 shellcode   getSymbol(Elf64_Ehdr *header) {
   Elf64_Sym   *sym;
