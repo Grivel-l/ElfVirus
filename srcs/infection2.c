@@ -46,14 +46,6 @@ int   entry_point(void *magic) {
   char    procName[] = "/proc/";
 
   asm("nop");
-  asm("nop");
-  asm("nop");
-  asm("nop");
-  asm("nop");
-  asm("nop");
-  asm("nop");
-  asm("nop");
-  asm("nop");
   /* if (checkProcess(procName) != 0) */
   /*   return (stop(1, magic)); */
   /* if (preventDebug() == -1) */
@@ -592,6 +584,8 @@ static void modifyStructure(unsigned char *code, size_t size) {
 
   i = 0;
   while (i < size) {
+    if (code[i] == 0x90)
+      code[i] = 0xcc;
     i += 1;
   }
 }
