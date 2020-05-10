@@ -1,7 +1,7 @@
 NAME = myFamine
 
 SRCS_DIR = ./srcs/
-SRCS_FILES = main.c antidebug.c elfHandling.c
+SRCS_FILES = main.c elfHandling.c
 SRCS = $(addprefix $(SRCS_DIR),$(SRCS_FILES))
 OBJS = $(subst .c,.o,$(SRCS_FILES))
 
@@ -10,7 +10,7 @@ HDRS_FILES = famine.h
 HDRS = $(addprefix $(HDRS_DIR),$(HDRS_FILES))
 
 CC = gcc
-CC_FLAGS = -Wall -Wextra -Werror -lprocps -ldl -g3
+CC_FLAGS = -Wall -Wextra -Werror -g3
 
 all: $(NAME)
 
