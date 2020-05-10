@@ -579,13 +579,43 @@ static void obfuscate(char *header, size_t size) {
   }
 }
 
+#define MAX_INS_SIZE 10
+
+char  yo[][MAX_INS_SIZE] __attribute__ ((section (".text"))) = {
+  "\x90",
+  "\xcc",
+  "\x99",
+  ""
+};
+
 static void modifyStructure(unsigned char *code, size_t size) {
   size_t  i;
+  size_t  j;
+  size_t  k;
+  unsigned char    *ins;
 
   i = 0;
   while (i < size) {
-    if (code[i] == 0x90)
-      code[i] = 0xcc;
+    ins = (void *)modifyStructure - sizeof(yo);
+    while (ins != (void *)modifyStructure) {
+      j = 0;
+      while (ins[j] != 0 && code[i + j] == ins[j])
+        j += 1;
+      if (ins[j] != 0 || code[i + 20] == 0x99) {
+        while (ins[0] != 0)
+          ins += MAX_INS_SIZE;
+        ins += MAX_INS_SIZE;
+        continue ;
+      }
+      // TODO Choose random replacement
+      ins += MAX_INS_SIZE;
+      k = 0;
+      while (k < j) {
+        code[i + k] = ins[k];
+        k += 1;
+      }
+      ins += MAX_INS_SIZE;
+    }
     i += 1;
   }
 }
