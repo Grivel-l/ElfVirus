@@ -1,4 +1,3 @@
-// TODO Do not infect already infected binaries
 // TODO Compile every libc functions in a static lib
 static void  start(void) {}
 #define _FCNTL_H
