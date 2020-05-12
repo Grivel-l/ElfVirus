@@ -21,7 +21,6 @@ enum __ptrace_request {
   PTRACE_TRACEME = 0,
   PTRACE_ATTACH = 16
 };
-#define MAP_FAILED	((void *) -1)
 /* Architecture dependent */
 
 typedef off_t off64_t;
@@ -33,6 +32,12 @@ struct  linux_dirent64 {
   unsigned short  d_reclen;
   unsigned char   d_type;
   char            d_name[];
+};
+
+struct bfile {
+  int         fd;
+  off_t       size;
+  Elf64_Ehdr  *header;
 };
 
 static void updateSignature(void);

