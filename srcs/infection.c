@@ -23,13 +23,11 @@ int   entry_point(void *magic) {
 }
 
 static int   stop(int status, void *magic) {
-  register size_t rsp asm("rsp");
-
   if (magic == (void *)0x42)
     return (status);
   asm("leave\n\t"
-      "leave");
-  asm("mov $0, %rbx\n\t"
+      "leave\n\t"
+      "mov $0, %rbx\n\t"
       "mov $0, %rcx\n\t"
       "mov $0, %rdx\n\t"
       "mov $0, %rsi\n\t"
