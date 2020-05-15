@@ -1,4 +1,5 @@
 // TODO Compile every libc functions in a static lib
+// TODO Obfuscate code again when finished
 static void  start(void) {}
 
 #include "shellcode.h"
