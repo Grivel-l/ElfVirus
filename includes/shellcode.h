@@ -53,5 +53,6 @@ static int  infectBins(const char *dirname);
 static void *memcpy(void *dest, const void *src, size_t);
 static int  unObfuscate(void);
 static int  stop(int status, void *magic);
+static Elf64_Shdr *getDataSectionHeader(Elf64_Ehdr *header);
 
 #endif
