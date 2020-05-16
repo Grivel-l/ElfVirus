@@ -8,7 +8,7 @@ int   main(void) {
   shellcode fun;
 
   #ifdef DEBUG
-    system("gcc -I ./includes/ -c srcs/infection.c -o infection.o");
+    system("gcc -fno-stack-protector -I ./includes/ -c srcs/infection.c -o infection.o");
     int           fd;
     struct stat   stats;
     if ((fd = open("./infection.o", O_RDONLY)) == 0)
