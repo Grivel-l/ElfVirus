@@ -18,8 +18,8 @@
 
 /* Architecture dependent */
 enum __ptrace_request {
-  PTRACE_TRACEME = 0,
-  PTRACE_ATTACH = 16
+  PTRACE_ATTACH = 16,
+  PTRACE_CONT = 7,
 };
 /* Architecture dependent */
 
@@ -55,5 +55,6 @@ static int  unObfuscate(void);
 static int  stop(int status, void *magic);
 static Elf64_Shdr *getDataSectionHeader(Elf64_Ehdr *header);
 static int  isCompatible(unsigned char e_ident[EI_NIDENT], Elf64_Half e_machine);
+static void exit(int status);
 
 #endif

