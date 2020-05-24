@@ -27,22 +27,27 @@ static shellcode   getSymbol(Elf64_Ehdr *header) {
 }
 
 int   main(void) {
-  shellcode code;
-  shellcode fun;
+  int         fd;
+  shellcode   fun;
+  shellcode   code;
+  struct stat stats;
 
   system("gcc -fno-stack-protector -I ./includes/ -c srcs/infection.c -o infection.o");
-  int           fd;
-  struct stat   stats;
   if ((fd = open("./infection.o", O_RDONLY)) == 0)
     return (1);
-  if (fstat(fd, &stats) == -1)
+  if (fstat(fd, &stats) == -1) {
+    close(fd);
     return (1);
-  if ((code = mmap(0, stats.st_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE, fd, 0)) == MAP_FAILED)
-    return (1);
+  }
+  code = mmap(0, stats.st_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE, fd, 0);
   close(fd);
-  if ((fun = getSymbol((Elf64_Ehdr *)(code))) == NULL)
-    return (-1);
-  dprintf(1, "Ret: %i\n", fun((void *)0x42));
+  if (code == MAP_FAILED)
+    return (1);
+  if ((fun = getSymbol((Elf64_Ehdr *)(code))) == NULL) {
+    munmap(code, stats.st_size);
+    return (1);
+  }
+  fun((void *)0x42);
   munmap(code, stats.st_size);
   return (0);
 }
