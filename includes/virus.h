@@ -14,6 +14,4 @@
 
 typedef int (*shellcode)(void *);
 
-shellcode   getSymbol(Elf64_Ehdr *header);
-
 #endif

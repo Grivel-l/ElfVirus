@@ -1,7 +1,7 @@
 NAME = myVirus
 
 SRCS_DIR = ./srcs/
-SRCS_FILES = main.c elfHandling.c
+SRCS_FILES = main.c
 SRCS = $(addprefix $(SRCS_DIR),$(SRCS_FILES))
 OBJS = $(subst .c,.o,$(SRCS_FILES))
 
@@ -10,7 +10,7 @@ HDRS_FILES = virus.h
 HDRS = $(addprefix $(HDRS_DIR),$(HDRS_FILES))
 
 CC = gcc
-CC_FLAGS = -Wall -Wextra -Werror -g3
+CC_FLAGS = -Wall -Wextra -Werror
 
 all: $(NAME)
 
