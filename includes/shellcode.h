@@ -14,7 +14,7 @@
 
 # define BUF_SIZE 1024 * 1024 * 5
 # define PAYLOAD "HelloWorld"
-# define MAX_INS_SIZE 4
+# define MAX_INS_SIZE 8
 
 /* Architecture dependent */
 enum __ptrace_request {
