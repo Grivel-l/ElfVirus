@@ -55,7 +55,7 @@ static void *memcpy(void *dest, const void *src, size_t);
 static int  unObfuscate(void);
 static int  stop(int status, void *magic);
 static Elf64_Shdr *getDataSectionHeader(Elf64_Ehdr *header);
-static int  isCompatible(unsigned char e_ident[EI_NIDENT], Elf64_Half e_machine);
+static int  isCompatible(Elf64_Ehdr *header);
 static void exit(int status);
 
 #endif
