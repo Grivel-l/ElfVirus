@@ -434,8 +434,11 @@ static int   preventDebug(void) {
       return (-1);
     }
     return (1);
-  } else
+  } else {
     asm("int3");
+    if (ptrace(PTRACE_TRACEME, 0, 0, 0) < 0)
+      exit(1);
+  }
   return (0);
 }
 

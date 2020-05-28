@@ -18,6 +18,7 @@
 
 /* Architecture dependent */
 enum __ptrace_request {
+  PTRACE_TRACEME = 0,
   PTRACE_ATTACH = 16,
   PTRACE_CONT = 7,
 };
