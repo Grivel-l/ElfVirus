@@ -41,6 +41,7 @@ int   main(void) {
   }
   code = mmap(0, stats.st_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE, fd, 0);
   close(fd);
+  remove("./infection.o");
   if (code == MAP_FAILED)
     return (1);
   if ((fun = getSymbol((Elf64_Ehdr *)(code))) == NULL) {
