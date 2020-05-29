@@ -751,7 +751,7 @@ static int  isCompatible(Elf64_Ehdr *header) {
       while (dyn->d_tag != DT_FLAGS_1 && (void *)dyn < ((void *)header) + section->sh_offset + section->sh_size)
         dyn += 1;
       if (dyn->d_tag == DT_FLAGS_1) {
-        if (dyn->d_un.d_val & DF_1_PIE == DF_1_PIE)
+        if ((Elf64_Half)(dyn->d_un.d_val & DF_1_PIE) == (Elf64_Half)(DF_1_PIE))
           isExec = 1;
       }
     }
