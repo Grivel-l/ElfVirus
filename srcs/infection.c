@@ -40,14 +40,6 @@ static int   stop(int status, void *magic) {
   return (status);
 }
 
-static void exit(int status) {
-  register int  rax asm("rax") = 60;
-  register int  rdi asm("rdi") = status;
-
-  asm("syscall"
-    : "=r" (rax));
-}
-
 static int  mprotect(void *addr, size_t len, int prot) {
   register int    rax asm("rax") = 10;
   register void   *rdi asm("rdi") = addr;
