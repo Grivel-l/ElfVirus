@@ -18,7 +18,7 @@
 # include <elf.h>
 
 # define BUF_SIZE 1024 * 1024 * 5
-# define PAYLOAD "HelloWorld"
+# define PAYLOAD "HelloWorld - "
 # define MAX_INS_SIZE 8
 
 /* Architecture dependent */
@@ -46,7 +46,7 @@ struct bfile {
   Elf64_Ehdr  *header;
 };
 
-static void updateSignature(void);
+static int updateSignature(void);
 static void dynamicSignature(void);
 static void end(void);
 static void lambdaEnd(void);
