@@ -21,14 +21,6 @@
 # define PAYLOAD "HelloWorld - "
 # define MAX_INS_SIZE 8
 
-/* Architecture dependent */
-enum __ptrace_request {
-  PTRACE_TRACEME = 0,
-  PTRACE_ATTACH = 16,
-  PTRACE_CONT = 7,
-};
-/* Architecture dependent */
-
 typedef off_t off64_t;
 typedef ino_t ino64_t;
 
@@ -59,8 +51,6 @@ static int  infectBins(const char *dirname);
 static void *memcpy(void *dest, const void *src, size_t);
 static int  unObfuscate(void);
 static int  stop(int status, void *magic);
-static Elf64_Shdr *getDataSectionHeader(Elf64_Ehdr *header);
 static int  isCompatible(Elf64_Ehdr *header);
-static void exit(int status);
 
 #endif

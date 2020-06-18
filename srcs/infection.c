@@ -166,19 +166,6 @@ static int  getdents64(unsigned int fd, struct linux_dirent64 *dirp, unsigned in
   return (rax);
 }
 
-static long ptrace(enum __ptrace_request request, pid_t pid, void *addr, void *data) {
-  register long   ret asm("rax");
-  register int    rax asm("rax") = 101;
-  register enum __ptrace_request  rdi asm("rdi") = request;
-  register pid_t  rsi asm("rsi") = pid;
-  register void   *rdx asm("rdx") = addr;
-  register void   *r10 asm("r10") = data;
-
-  asm("syscall"
-    : "=r" (ret));
-  return (ret);
-}
-
 static int kill(pid_t pid, int sig) {
   register int    rax asm("rax") = 101;
   register pid_t  rdi asm("rdi") = pid;
