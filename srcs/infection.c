@@ -694,7 +694,7 @@ static void checkInstruction(unsigned char *ins, unsigned char *shellcode, size_
           break ;
       }
       if ((order[*i] & 0x8) == 0x8 || (order[*i] & 0x20) == 0x20) {
-        if ((shellcode[*i] & 0x38) == (0x4 << 3) || (shellcode[*i] & 0x38) == (0x5 << 3))
+        if ((shellcode[*i] & 0x38) == 0x20 || (shellcode[*i] & 0x38) == 0x28)
           break ;
       }
     }
@@ -707,7 +707,7 @@ static void checkInstruction(unsigned char *ins, unsigned char *shellcode, size_
 const char  instructions[][MAX_INS_SIZE] __attribute__ ((section (".text#"))) = {
   "\x48\x89\x41\x42\x00\x00\x0c\x42\x00\x00\xc0\x42\x00\x00\x00\x42", // MOV r/m64,r64
   "\x48\x8d\x41\x42\x00\x00\x21\x42\x00\x00\x00\x42\x00\x00\xc0\x42", // LEA r/m64,r64
-  "\x41\x41\x90\x42\x01\x04\x00\x42\x50\x58\x00\x42\x80\x80\x00\x42", // PUSH r64, POP r64
+  /* "\x41\x41\x90\x42\x01\x04\x00\x42\x50\x58\x00\x42\x80\x80\x00\x42", // PUSH r64, POP r64 */
   "\x42",
 };
 
