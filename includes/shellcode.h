@@ -19,7 +19,7 @@
 
 # define BUF_SIZE 1024 * 1024 * 5
 # define PAYLOAD "HelloWorld - "
-# define MAX_INS_SIZE 16
+# define MAX_INS_SIZE 28
 # define MAX_DYN_LEN 20
 
 typedef off_t off64_t;
