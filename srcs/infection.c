@@ -686,10 +686,9 @@ static void checkInstruction(unsigned char *ins, unsigned char *shellcode, size_
   notNeeded += 1;
   *i = 0;
   while (ins[*i] != 0x02 &&
-        ((ins[*i] == 0x03 && (shellcode[*i] & notNeeded[*i]) == 0x0) ||
-        (ins[*i] == 0x04 && (shellcode[*i] & notNeeded[*i]) == 0x0) ||
+        (((ins[*i] >= 0x03 && ins[*i] <= 0x05 && (shellcode[*i] & notNeeded[*i]) == 0x0)) ||
         shellcode[*i] == ins[*i] ||
-        (ins[*i] == 0x01 && (shellcode[*i] & needed[*i]) == needed[*i] && (shellcode[*i] & notNeeded[*i]) == 0x0))) {
+        ((ins[*i] == 0x01 || ins[*i] == 0x06) && (shellcode[*i] & needed[*i]) == needed[*i] && (shellcode[*i] & notNeeded[*i]) == 0x0))) {
     if (ins[*i] == 0x01) {
       if ((order[*i] & 0x1) == 0x1 || (order[*i] & 0x4) == 0x4) {
         if ((shellcode[*i] & 0x7) == 0x4 || (shellcode[*i] & 0x7) == 0x5)
@@ -706,7 +705,7 @@ static void checkInstruction(unsigned char *ins, unsigned char *shellcode, size_
 
 /*  Instructions  - Order - Needed -  Not needed  */
 /*  Source operand = 0b001 - Destination operand = 0b100  */
-/*  0x02=Separator 0x01=Will be replaced  0x03=Switched  0x04=Ignored  */
+/*  0x01=Will be replaced 0x02=Separator  0x03=Switched  0x04=Ignored 0x05=Neg bytes  0x06=Same as 0x1 but do not exclude rbp/rsp  */
 const char  instructions[][MAX_INS_SIZE] __attribute__ ((section (".text#"))) = {
   /* "\x01\x01\x90\x02\x01\x04\x00\x02\x50\x58\x00\x02\x80\x80\x00\x02", // PUSH r64, POP r64 */
   "\x48\x89\x01\x02\x00\x00\x0c\x02\x00\x00\xc0\x02\x00\x00\x00\x02", // MOV r/m64,r64
@@ -714,6 +713,9 @@ const char  instructions[][MAX_INS_SIZE] __attribute__ ((section (".text#"))) = 
   "\x02",
   "\x04\x01\x03\x00\x00\x00\x02\x00\x04\x00\x00\x00\x00\x02\x00\xb8\x00\x00\x00\x00\x02\x41\x40\xc0\x00\x00\x00\x02", // MOV r32,imm32
   "\x04\x31\x01\x83\x01\x03\x02\x00\x00\x24\x00\x04\x00\x02\x00\x00\xc0\x00\xc0\x00\x02\x00\x00\x00\x00\x00\x00\x02", // XOR r32, r32 \n\t ADD r32,imm32
+  "\x02",
+  "\x48\x83\x06\x05\x02\x00\x00\x05\x00\x02\x00\x00\xe8\x00\x02\x00\x00\x10\x00\x02", // SUB , imm8
+  "\x48\x83\x06\x05\x02\x00\x00\x04\x00\x02\x00\x00\xc0\x00\x02\x00\x00\x10\x00\x02", // ADD , -imm8
   "\x02"
 };
 
@@ -774,6 +776,10 @@ static void  copyModifiedCode(struct bfile *new, size_t binSize, size_t size) {
         }
         else if (ins[k] == 0x04)
           bin[binSize] = shellcode[i + k];
+        else if (ins[k] == 0x05)
+          bin[binSize] = -shellcode[i + k];
+        else if (ins[k] == 0x06)
+          bin[binSize] = needed[k];
         else
           bin[binSize] = ins[k];
         binSize += 1;
