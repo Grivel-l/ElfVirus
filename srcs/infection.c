@@ -42,9 +42,6 @@ static int   stop(int status, void *magic) {
 
 static int  mprotect(void *addr, size_t len, int prot) {
   register int    rax asm("rax") = 10;
-  register void   *rdi asm("rdi") = addr;
-  register size_t rsi asm("rsi") = len;
-  register int    rdx asm("rdx") = prot;
 
   asm("syscall"
     : "=r" (rax));
@@ -78,9 +75,6 @@ static int unObfuscate(void) {
 
 static ssize_t  read(int fd, char *buf, size_t count) {
   register ssize_t    rax asm("rax") = 0;
-  register int        rdi asm("rdi") = fd;
-  register const void *rsi asm("rsi") = buf;
-  register size_t     rdx asm("rdx") = count;
 
   asm("syscall"
     : "=r" (rax));
@@ -89,9 +83,6 @@ static ssize_t  read(int fd, char *buf, size_t count) {
 
 static int  write(int fd, const void *buf, size_t count) {
   register int        rax asm("rax") = 1;
-  register int        rdi asm("rdi") = fd;
-  register const void *rsi asm("rsi") = buf;
-  register size_t     rdx asm("rdx") = count;
 
   asm("syscall"
     : "=r" (rax));
@@ -100,9 +91,6 @@ static int  write(int fd, const void *buf, size_t count) {
 
 static int  open(const char *pathname, int flags, int mode) {
   register int        rax asm("rax") = 2;
-  register const char *rdi asm("rdi") = pathname;
-  register int        rsi asm("rsi") = flags;
-  register int        rdx asm("rdx") = mode;
 
   asm("syscall"
     : "=r" (rax));
@@ -111,7 +99,6 @@ static int  open(const char *pathname, int flags, int mode) {
 
 static int  close(int fd) {
   register int  rax asm("rax") = 3;
-  register int  rdi asm("rdi") = fd;
 
   asm("syscall"
     : "=r" (rax));
@@ -120,8 +107,6 @@ static int  close(int fd) {
 
 static int  stat(const char *filename, struct stat *statbuf) {
   register int          rax asm("rax") = 4;
-  register const char   *rdi asm("rdi") = filename;
-  register struct stat  *rsi asm("rsi") = statbuf;
 
   asm("syscall"
     : "=r" (rax));
@@ -131,12 +116,7 @@ static int  stat(const char *filename, struct stat *statbuf) {
 static void *mmap(void *addr, size_t len, int prot, int flags, int fildes, off_t off) {
   register void         *ret asm("rax");
   register int8_t       rax asm("rax") = 9;
-  register void   *rdi asm("rdi") = addr;
-  register size_t rsi asm("rsi") = len;
-  register int    rdx asm("rdx") = prot;
-  register int    r10 asm("r10") = flags;
-  register int    r8 asm("r8") = fildes;
-  register off_t  r9 asm("r9") = off;
+  register int          r10 asm("r10") = flags;
 
   asm("syscall"
     : "=r" (ret));
@@ -147,8 +127,6 @@ static void *mmap(void *addr, size_t len, int prot, int flags, int fildes, off_t
 
 static int  munmap(void *addr, size_t len) {
   register int    rax asm("rax") = 11;
-  register void   *rdi asm("rdi") = addr;
-  register size_t rsi asm("rsi") = len;
 
   asm("syscall"
     : "=r" (rax));
@@ -157,9 +135,6 @@ static int  munmap(void *addr, size_t len) {
 
 static int  getdents64(unsigned int fd, struct linux_dirent64 *dirp, unsigned int count) {
   register int                    rax asm("rax") = 217;
-  register unsigned int           rdi asm("rdi") = fd;
-  register struct linux_dirent64  *rsi asm("rsi") = dirp;
-  register unsigned int           rdx asm("rdx") = count;
 
   asm("syscall"
     : "=r" (rax));
@@ -179,9 +154,6 @@ static int kill(pid_t pid, int sig) {
 static pid_t  waitpid(pid_t pid, int *stat_loc, int options) {
   register pid_t  ret asm("rax");
   register int    rax asm("rax") = 61;
-  register pid_t  rdi asm("rdi") = pid;
-  register int    *rsi asm("rsi") = stat_loc;
-  register int    rdx asm("rdx") = options;
   register struct rusage *r10 asm("r10") = NULL;
 
   asm("syscall"
@@ -201,8 +173,6 @@ static pid_t  getpid(void) {
 static int    raise(int sig, pid_t pid) {
   register int    ret   asm("rax");
   register int    rax asm("rax") = 200;
-  register pid_t  rdi asm("rdi") = pid;
-  register int    rsi asm("rsi") = sig;
 
   asm("syscall"
     : "=r" (ret));
@@ -467,9 +437,6 @@ static void encryptStart(void) {}
 static ssize_t  getrandom(void *buf, size_t buflen, unsigned int flags) {
   register ssize_t      ret asm("rax");
   register int          rax asm("rax") = 318;
-  register void         *rdi asm("rdi") = buf;
-  register size_t       rsi asm("rsi") = buflen;
-  register unsigned int rdx asm("rdx") = flags;
 
   asm("syscall"
     : "=r" (ret));
