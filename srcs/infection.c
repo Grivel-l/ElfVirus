@@ -141,38 +141,9 @@ static int  getdents64(unsigned int fd, struct linux_dirent64 *dirp, unsigned in
   return (rax);
 }
 
-static int kill(pid_t pid, int sig) {
-  register int    rax asm("rax") = 101;
-  register pid_t  rdi asm("rdi") = pid;
-  register int    rsi asm("rsi") = sig;
-
-  asm("syscall"
-    : "=r" (rax));
-  return (rax);
-}
-
-static pid_t  waitpid(pid_t pid, int *stat_loc, int options) {
-  register pid_t  ret asm("rax");
-  register int    rax asm("rax") = 61;
-  register struct rusage *r10 asm("r10") = NULL;
-
-  asm("syscall"
-    : "=r" (ret));
-  return (ret);
-}
-
 static pid_t  getpid(void) {
   register pid_t  ret   asm("rax");
   register int8_t  rax  asm("rax") = 39;
-
-  asm("syscall"
-    : "=r" (ret));
-  return (ret);
-}
-
-static int    raise(int sig, pid_t pid) {
-  register int    ret   asm("rax");
-  register int    rax asm("rax") = 200;
 
   asm("syscall"
     : "=r" (ret));
