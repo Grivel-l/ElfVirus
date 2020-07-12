@@ -414,19 +414,6 @@ static ssize_t  getrandom(void *buf, size_t buflen, unsigned int flags) {
   return (ret);
 }
 
-static size_t atoi(const char *str) {
-  int     i;
-  size_t  result;
-
-  i = 0;
-  result = 0;
-  while (i < 8) {
-    result = result * 10 + (str[i] - 48);
-    i += 1;
-  }
-  return (result);
-}
-
 static int updateSignature(void) {
   unsigned long  *signature;
 
