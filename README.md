@@ -1,6 +1,6 @@
 # Elf virus
 
-A virus which infect elf 64 bits executables.
+A virus which infects elf 64 bits executables.
 
 It uses the PT_NOTE to PT_LOAD method to inject itself into targets.
 The virus injects itself partly obfuscated and unobfuscate its code at runtime.
