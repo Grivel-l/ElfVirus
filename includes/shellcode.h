@@ -13,7 +13,6 @@
 # include <bits/mman.h>
 # include <bits/waitflags.h>
 # include <bits/waitstatus.h>
-# include <bits/signum.h>
 # include <dirent.h>
 # include <elf.h>
 
